@@ -275,7 +275,8 @@
   background: #05080d;
   min-height: 120px;
 }
-.dossier-cam img {
+.dossier-cam img,
+.dossier-cam video {
   display: block;
   width: 100%;
   height: auto;
@@ -609,10 +610,13 @@
 .cg-lb-road {
   color: #7d8aa0;
 }
-.cg-lb-card img {
+.cg-lb-card img,
+.cg-lb-card video {
   width: 100%;
   display: block;
   background: #05080d;
+  max-height: 70vh;
+  object-fit: contain;
 }
 .cg-lb-foot {
   color: #7d8aa0;

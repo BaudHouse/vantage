@@ -136,14 +136,34 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
                 ✕
               </button>
             </div>
-            <img src={live(zoom.image, lbTick)} alt={zoom.name} />
+            {zoom.video ? (
+              <video
+                key={zoom.id}
+                src={zoom.video}
+                poster={zoom.image}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            ) : (
+              <img src={live(zoom.image, lbTick)} alt={zoom.name} />
+            )}
             <div className="cg-lb-foot">
               <span>
                 {zoom.source}
-                {zoom.live ? ' · streaming ~1s' : ' · refreshing'}
+                {zoom.video
+                  ? ' · video feed'
+                  : zoom.live
+                    ? ' · streaming ~1s'
+                    : ' · refreshing'}
               </span>
-              <a href={live(zoom.image, lbTick)} target="_blank" rel="noreferrer">
-                open full image ↗
+              <a
+                href={zoom.video || live(zoom.image, lbTick)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                open {zoom.video ? 'video' : 'full image'} ↗
               </a>
             </div>
           </div>

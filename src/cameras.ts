@@ -9,7 +9,8 @@ import type { Camera } from './layers'
 const DEV = import.meta.env.DEV
 const CT = DEV ? '/feeds/caltrans' : 'https://cwwp2.dot.ca.gov'
 const NYC = DEV ? '/feeds/nyccams' : 'https://webcams.nyctmc.org'
-// Images load directly (no CORS needed for <img>); always hit the real host.
+const TFL = DEV ? '/feeds/tfl' : 'https://api.tfl.gov.uk'
+// Images/video load directly (no CORS needed for <img>/<video>).
 const NYC_IMG = 'https://webcams.nyctmc.org'
 
 async function tfetch(url: string, ms = 9000): Promise<any | null> {
@@ -108,8 +109,45 @@ async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
   return out
 }
 
+/** Transport for London JamCams — JPEG still + short MP4 clip (a real feed). */
+async function fetchTfl(limit = 400): Promise<Camera[]> {
+  const list = await tfetch(`${TFL}/Place/Type/JamCam`)
+  if (!Array.isArray(list)) return []
+  const out: Camera[] = []
+  for (const c of list) {
+    if (out.length >= limit) break
+    const lat = num(c?.lat)
+    const lng = num(c?.lon)
+    if (!lat || !lng) continue
+    const props: any[] = c?.additionalProperties ?? []
+    const get = (k: string) => props.find((p) => p?.key === k)?.value
+    const img = get('imageUrl')
+    const vid = get('videoUrl')
+    const available = (get('available') ?? 'true') !== 'false'
+    if (!img || !available) continue
+    out.push({
+      kind: 'camera',
+      id: `tfl-${c.id}`,
+      lat,
+      lng,
+      name: c?.commonName ?? 'London camera',
+      road: (c?.commonName ?? '').split(' ')[0] ?? '',
+      region: 'London · UK',
+      image: img,
+      video: vid || undefined,
+      source: 'TfL JamCam',
+      live: false,
+    })
+  }
+  return out
+}
+
 export async function fetchCameras(): Promise<Camera[]> {
-  const [nyc, ca] = await Promise.all([fetchNyc(), fetchCaltrans()])
-  // Live NYC cams first so they lead the gallery.
-  return [...nyc, ...ca]
+  const [nyc, ca, tfl] = await Promise.all([
+    fetchNyc(),
+    fetchCaltrans(),
+    fetchTfl(),
+  ])
+  // Live NYC cams first, then London (video), then California.
+  return [...nyc, ...tfl, ...ca]
 }

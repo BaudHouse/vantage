@@ -60,9 +60,12 @@ export function connectShips() {
         }),
       )
     }
-    ws.onmessage = (ev) => {
+    ws.onmessage = async (ev) => {
       try {
-        const msg = JSON.parse(ev.data as string)
+        // AISStream delivers frames as Blobs, not strings.
+        const raw: string =
+          typeof ev.data === 'string' ? ev.data : await (ev.data as Blob).text()
+        const msg = JSON.parse(raw)
         const meta = msg?.MetaData ?? {}
         const mmsi = String(meta?.MMSI ?? '')
         if (!mmsi) return

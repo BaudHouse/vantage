@@ -49,6 +49,7 @@ export interface Camera {
   road: string
   region: string // searchable: state / metro / district, e.g. "New York · Manhattan"
   image: string // JPEG URL (cache-bust to refresh)
+  video?: string // optional short MP4 clip (e.g. TfL JamCams) — a real moving feed
   source: string
   live: boolean // true = updates every ~1-2s (poll fast); false = periodic still
 }

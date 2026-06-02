@@ -93,6 +93,7 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
 
   let rows: Row[] = []
   let image: string | undefined
+  let video: string | undefined
   let url: string | undefined
   if (e.kind === 'aircraft') rows = aircraftRows(e as Aircraft)
   else if (e.kind === 'ship') rows = shipRows(e as Ship)
@@ -106,6 +107,7 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
       { k: 'Source', v: c.source },
     ]
     image = c.image
+    video = c.video
   } else {
     const ev = e as GeoEvent
     rows = eventRows(ev)
@@ -133,9 +135,13 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
         </button>
       </div>
 
-      {liveImg && (
+      {(liveImg || video) && (
         <div className="dossier-cam">
-          <img src={liveImg} alt="live camera" loading="lazy" />
+          {video ? (
+            <video src={video} poster={image} autoPlay loop muted playsInline />
+          ) : (
+            <img src={liveImg} alt="live camera" loading="lazy" />
+          )}
           <span className="cam-live">● LIVE</span>
         </div>
       )}

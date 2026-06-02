@@ -53,6 +53,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/feeds\/nyccams/, ''),
       },
+      // Transport for London JamCams (no key) — live JPEG + short MP4 clips.
+      '/feeds/tfl': {
+        target: 'https://api.tfl.gov.uk',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/feeds\/tfl/, ''),
+      },
       // RainViewer radar frame index, no key (tiles load directly as textures).
       '/feeds/rainviewer': {
         target: 'https://api.rainviewer.com',
