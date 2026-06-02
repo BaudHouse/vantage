@@ -47,6 +47,7 @@ export interface Camera {
   lng: number
   name: string
   road: string
+  region: string // searchable: state / metro / district, e.g. "New York · Manhattan"
   image: string // JPEG URL (cache-bust to refresh)
   source: string
   live: boolean // true = updates every ~1-2s (poll fast); false = periodic still

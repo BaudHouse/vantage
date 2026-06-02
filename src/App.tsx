@@ -31,6 +31,7 @@ import LayerPanel from './components/LayerPanel'
 import Dossier from './components/Dossier'
 import CameraGallery from './components/CameraGallery'
 import Launcher from './components/Launcher'
+import KeySetup from './components/KeySetup'
 import './App.css'
 import './layers.css'
 
@@ -54,6 +55,7 @@ export default function App() {
   const [selected, setSelected] = useState<Entity | null>(null)
   const [briefing, setBriefing] = useState<Briefing | null>(null)
   const [gallery, setGallery] = useState(false)
+  const [keySetup, setKeySetup] = useState(false)
   const [focus, setFocus] = useState<{ entity: Entity; n: number } | null>(null)
   const [viewers] = useState(() => 90 + Math.floor(Math.random() * 60))
   const askN = useRef(0)
@@ -298,6 +300,7 @@ export default function App() {
             counts={counts}
             keyMissing={keyMissing}
             onToggle={toggle}
+            onKeySetup={() => setKeySetup(true)}
           />
           {selected && (
             <Dossier
@@ -336,6 +339,7 @@ export default function App() {
         open={gallery}
         onClose={() => setGallery(false)}
       />
+      <KeySetup open={keySetup} onClose={() => setKeySetup(false)} />
     </div>
   )
 }

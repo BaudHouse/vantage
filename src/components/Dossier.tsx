@@ -101,6 +101,7 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
     const c = e as Camera
     rows = [
       { k: 'Location', v: c.name },
+      { k: 'Region', v: c.region },
       { k: 'Road', v: c.road || '—' },
       { k: 'Source', v: c.source },
     ]

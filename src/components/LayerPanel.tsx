@@ -5,6 +5,7 @@ interface Props {
   counts: Record<LayerId, number>
   keyMissing: Set<LayerId>
   onToggle: (id: LayerId) => void
+  onKeySetup: () => void
 }
 
 export default function LayerPanel({
@@ -12,10 +13,16 @@ export default function LayerPanel({
   counts,
   keyMissing,
   onToggle,
+  onKeySetup,
 }: Props) {
   return (
     <div className="layer-panel">
-      <div className="lp-head">LAYERS</div>
+      <div className="lp-head">
+        <span>LAYERS</span>
+        <button className="lp-keys" onClick={onKeySetup} title="Unlock keyed layers">
+          🔑
+        </button>
+      </div>
       {LAYERS.map((l) => {
         const on = active.has(l.id)
         const missing = keyMissing.has(l.id)
@@ -23,10 +30,10 @@ export default function LayerPanel({
           <button
             key={l.id}
             className={`lp-row ${on ? 'on' : ''}`}
-            onClick={() => onToggle(l.id)}
+            onClick={() => (missing ? onKeySetup() : onToggle(l.id))}
             title={
               missing
-                ? `Needs a free ${l.needsKey} in .env.local`
+                ? `Needs a free ${l.needsKey} — click to set up`
                 : `Toggle ${l.label}`
             }
           >

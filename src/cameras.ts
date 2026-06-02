@@ -48,6 +48,7 @@ async function fetchNyc(limit = 400): Promise<Camera[]> {
       lng,
       name: c?.name ?? 'NYC camera',
       road: c?.area ?? 'New York City',
+      region: `New York · NYC${c?.area ? ` · ${c.area}` : ''}`,
       image: `${NYC_IMG}/api/cameras/${c.id}/image`,
       source: 'NYC DOT · live',
       live: true,
@@ -57,6 +58,17 @@ async function fetchNyc(limit = 400): Promise<Camera[]> {
 }
 
 const DISTRICTS = ['d2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd11', 'd12']
+const CA_REGION: Record<string, string> = {
+  d2: 'Redding / North State',
+  d3: 'Sacramento',
+  d4: 'San Francisco Bay Area',
+  d5: 'Central Coast',
+  d6: 'Fresno / Central Valley',
+  d7: 'Los Angeles',
+  d8: 'San Bernardino / Inland Empire',
+  d11: 'San Diego',
+  d12: 'Orange County',
+}
 
 /** Caltrans — periodic stills, broad California coverage. */
 async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
@@ -65,8 +77,9 @@ async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
   )
   const results = await Promise.allSettled(reqs)
   const out: Camera[] = []
-  results.forEach((res) => {
+  results.forEach((res, idx) => {
     if (res.status !== 'fulfilled' || !res.value) return
+    const region = `California · ${CA_REGION[DISTRICTS[idx]] ?? DISTRICTS[idx]}`
     const list: any[] = res.value.data ?? []
     let taken = 0
     for (const row of list) {
@@ -84,6 +97,7 @@ async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
         lng,
         name: loc?.locationName ?? 'Traffic camera',
         road: loc?.route ?? loc?.nearbyPlace ?? '',
+        region,
         image: img,
         source: 'Caltrans',
         live: false,

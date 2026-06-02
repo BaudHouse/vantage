@@ -137,56 +137,81 @@ function spriteFor(e: Entity): THREE.Sprite {
   return sprite
 }
 
-// ---- RainViewer Mercator tiles -> globe equirectangular placement ----------
+// ---- weather radar overlay ------------------------------------------------
+// react-globe.gl's tiles layer won't reliably render async-textured custom
+// materials, so instead we composite all RainViewer Mercator tiles onto ONE
+// equirectangular canvas and drape it over a translucent sphere just above the
+// globe surface (three's SphereGeometry UVs are equirectangular, so it aligns
+// with the base map exactly).
+
+const GLOBE_R = 100 // three-globe's globe radius
 
 function mercY2lat(t: number): number {
   return (Math.atan(Math.sinh(Math.PI * (1 - 2 * t))) * 180) / Math.PI
 }
 
-interface RadarTile {
-  lat: number
-  lng: number
-  width: number
-  height: number
-  material: THREE.Material
+function loadImg(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((res) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => res(img)
+    img.onerror = () => res(null)
+    img.src = url
+  })
 }
 
-function buildRadarTiles(frame: RadarFrame): RadarTile[] {
-  const z = 3
+async function buildRadarSphere(frame: RadarFrame): Promise<THREE.Object3D | null> {
+  const z = 4
   const n = 1 << z
-  const loader = new THREE.TextureLoader()
-  loader.setCrossOrigin('anonymous')
-  const tiles: RadarTile[] = []
+  const W = 2048
+  const H = 1024
+  const cv = document.createElement('canvas')
+  cv.width = W
+  cv.height = H
+  const ctx = cv.getContext('2d')!
+
+  const jobs: Promise<void>[] = []
+  let drew = 0
   for (let x = 0; x < n; x++) {
     for (let y = 0; y < n; y++) {
       const latN = mercY2lat(y / n)
       const latS = mercY2lat((y + 1) / n)
       const lngW = (x / n) * 360 - 180
-      const height = latN - latS
-      if (height <= 0 || Math.abs((latN + latS) / 2) > 84) continue
       const url = frame.template
         .replace('{z}', String(z))
         .replace('{x}', String(x))
         .replace('{y}', String(y))
-      const tex = loader.load(url)
-      tex.colorSpace = THREE.SRGBColorSpace
-      const material = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-        side: THREE.FrontSide,
-      })
-      tiles.push({
-        lat: (latN + latS) / 2,
-        lng: lngW + 180 / n,
-        width: 360 / n,
-        height,
-        material,
-      })
+      jobs.push(
+        loadImg(url).then((img) => {
+          if (!img) return
+          const dx = ((lngW + 180) / 360) * W
+          const dw = (360 / n / 360) * W
+          const dy = ((90 - latN) / 180) * H
+          const dh = ((latN - latS) / 180) * H
+          ctx.drawImage(img, dx, dy, dw, dh)
+          drew++
+        }),
+      )
     }
   }
-  return tiles
+  await Promise.all(jobs)
+  if (!drew) return null
+
+  const tex = new THREE.CanvasTexture(cv)
+  tex.colorSpace = THREE.SRGBColorSpace
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    opacity: 0.6,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+  // Sphere UVs in three start at +X/−Z; the base globe image uses the same
+  // convention, so a plain sphere lines up with the map.
+  const geo = new THREE.SphereGeometry(GLOBE_R * 1.004, 96, 96)
+  const mesh = new THREE.Mesh(geo, mat)
+  mesh.renderOrder = 1
+  return mesh
 }
 
 export default function GlobeView({
@@ -228,6 +253,7 @@ export default function GlobeView({
     c.enableDamping = true
     c.dampingFactor = 0.1
     g.pointOfView({ lat: 30, lng: 20, altitude: 2.3 }, 0)
+    if (import.meta.env.DEV) (window as any).__globe = g
   }, [])
 
   const maxIntensity = useMemo(
@@ -235,10 +261,36 @@ export default function GlobeView({
     [intensity],
   )
 
-  const radarTiles = useMemo(
-    () => (radar ? buildRadarTiles(radar) : []),
-    [radar],
-  )
+  // Radar overlay is added straight to the three scene (react-globe.gl's custom
+  // layer wouldn't mount an externally-built mesh reliably).
+  const radarMeshRef = useRef<THREE.Mesh | null>(null)
+  useEffect(() => {
+    const g = globeRef.current
+    if (!g) return
+    const scene = g.scene()
+    const clear = () => {
+      if (radarMeshRef.current) {
+        scene.remove(radarMeshRef.current)
+        radarMeshRef.current.geometry.dispose()
+        ;(radarMeshRef.current.material as THREE.Material).dispose()
+        radarMeshRef.current = null
+      }
+    }
+    if (!radar) {
+      clear()
+      return
+    }
+    let cancelled = false
+    buildRadarSphere(radar).then((mesh) => {
+      if (cancelled || !mesh) return
+      clear()
+      scene.add(mesh)
+      radarMeshRef.current = mesh as THREE.Mesh
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [radar])
 
   const nameOf = (feat: any) =>
     feat?.properties?.ADMIN ?? feat?.properties?.NAME ?? ''
@@ -274,16 +326,6 @@ export default function GlobeView({
             ? `<div class="tip"><b>${nameOf(d)}</b><br/>${v} conflict report(s)/24h</div>`
             : `<div class="tip">${nameOf(d)}</div>`
         }}
-        // ---- weather radar tiles ----
-        tilesData={radarTiles}
-        tileLat={(d: any) => d.lat}
-        tileLng={(d: any) => d.lng}
-        tileAltitude={0.004}
-        tileWidth={(d: any) => d.width}
-        tileHeight={(d: any) => d.height}
-        tileUseGlobeProjection={true}
-        tileMaterial={(d: any) => d.material}
-        tilesTransitionDuration={0}
         // ---- event points (conflict / quake / disaster) ----
         pointsData={events}
         pointLat="lat"
