@@ -15,9 +15,16 @@
   "build": {
     "appId": "app.conflictly.desktop",
     "productName": "Conflictly",
-    "files": ["dist/**/*", "electron/**/*"],
-    "directories": { "output": "release" },
-    "win": { "target": "nsis" }
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    }
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -30,6 +37,7 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^10.0.1",
     "electron": "^42.3.0",

@@ -76,8 +76,10 @@ export default function KeySetup({ open, onClose }: Props) {
         <div className="ks-foot">
           <b>Where:</b> create / edit{' '}
           <code>C:\Projects\conflictly\.env.local</code>, add the line(s) above,
-          then restart the dev server. The file is gitignored — keys never leave
-          your machine.
+          then restart the dev server. The file is gitignored, so keys are never
+          committed. Note: for <i>local use</i> they stay on this machine — but
+          a packaged build inlines <code>VITE_</code> vars, so don't distribute a
+          build with keys baked in (load them at runtime instead).
         </div>
       </div>
     </div>

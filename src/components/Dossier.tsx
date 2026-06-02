@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ENTITY_COLOR, ENTITY_GLYPH, entityTitle, type Entity } from '../layers'
 import type { Aircraft, Ship, Camera, Fire } from '../layers'
 import type { GeoEvent } from '../feeds'
+import { safeUrl } from '../safe'
 
 interface Props {
   entity: Entity | null
@@ -165,8 +166,13 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
         <button className="dossier-ask" onClick={() => onAsk(e)}>
           ◉ Ask Operator about this
         </button>
-        {url && (
-          <a className="dossier-src" href={url} target="_blank" rel="noreferrer">
+        {safeUrl(url) && (
+          <a
+            className="dossier-src"
+            href={safeUrl(url)}
+            target="_blank"
+            rel="noreferrer"
+          >
             open source ↗
           </a>
         )}

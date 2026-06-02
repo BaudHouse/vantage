@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { safeUrl } from '../safe'
 
 // Tiny, dependency-free Markdown renderer. Builds React nodes directly (no
 // dangerouslySetInnerHTML) so LLM output can never inject HTML. Supports the
@@ -23,10 +24,15 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
     } else if (tok.startsWith('[')) {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(tok)
       if (mm) {
+        const href = safeUrl(mm[2])
         nodes.push(
-          <a key={key} href={mm[2]} target="_blank" rel="noreferrer">
-            {mm[1]}
-          </a>,
+          href ? (
+            <a key={key} href={href} target="_blank" rel="noreferrer">
+              {mm[1]}
+            </a>
+          ) : (
+            mm[1]
+          ),
         )
       }
     } else {

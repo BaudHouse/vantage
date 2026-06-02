@@ -1,4 +1,5 @@
 import type { GeoEvent } from '../feeds'
+import { safeUrl } from '../safe'
 
 function ago(t: number): string {
   const m = Math.max(0, Math.round((Date.now() - t) / 60000))
@@ -30,7 +31,7 @@ export default function Ticker({ events }: { events: GeoEvent[] }) {
             <a
               key={i}
               className="ticker-item"
-              href={e.url}
+              href={safeUrl(e.url) ?? '#'}
               target="_blank"
               rel="noreferrer"
             >

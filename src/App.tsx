@@ -32,6 +32,7 @@ import Dossier from './components/Dossier'
 import CameraGallery from './components/CameraGallery'
 import Launcher from './components/Launcher'
 import KeySetup from './components/KeySetup'
+import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 import './layers.css'
 
@@ -62,6 +63,15 @@ export default function App() {
 
   const on = useCallback((id: LayerId) => active.has(id), [active])
 
+  // Stable per-layer booleans so a polling effect only re-runs when ITS layer
+  // toggles — not on every unrelated layer change (which would tear down and
+  // reconnect the AIS websocket each time).
+  const onAircraft = active.has('aircraft')
+  const onCamera = active.has('camera')
+  const onFire = active.has('fire')
+  const onShip = active.has('ship')
+  const onWeather = active.has('weather')
+
   const load = useCallback(async () => {
     setLoading(true)
     const [ev, mk] = await Promise.all([fetchAll(), fetchMarkets()])
@@ -79,7 +89,7 @@ export default function App() {
 
   // Aircraft (ADS-B) — fast cadence while the layer is on.
   useEffect(() => {
-    if (!on('aircraft')) {
+    if (!onAircraft) {
       setAircraft([])
       return
     }
@@ -91,11 +101,11 @@ export default function App() {
       alive = false
       clearInterval(t)
     }
-  }, [on])
+  }, [onAircraft])
 
   // Traffic cameras — positions are static; refresh occasionally.
   useEffect(() => {
-    if (!on('camera')) {
+    if (!onCamera) {
       setCameras([])
       return
     }
@@ -107,11 +117,11 @@ export default function App() {
       alive = false
       clearInterval(t)
     }
-  }, [on])
+  }, [onCamera])
 
   // Wildfires (FIRMS) — key-gated.
   useEffect(() => {
-    if (!on('fire') || !firesEnabled()) {
+    if (!onFire || !firesEnabled()) {
       setFires([])
       return
     }
@@ -123,11 +133,11 @@ export default function App() {
       alive = false
       clearInterval(t)
     }
-  }, [on])
+  }, [onFire])
 
   // Vessels (AIS) — key-gated websocket stream; snapshot on a timer.
   useEffect(() => {
-    if (!on('ship') || !shipsEnabled()) {
+    if (!onShip || !shipsEnabled()) {
       setShips([])
       return
     }
@@ -137,11 +147,11 @@ export default function App() {
       clearInterval(t)
       disconnectShips()
     }
-  }, [on])
+  }, [onShip])
 
   // Weather radar frame.
   useEffect(() => {
-    if (!on('weather')) {
+    if (!onWeather) {
       setRadar(null)
       return
     }
@@ -153,7 +163,7 @@ export default function App() {
       alive = false
       clearInterval(t)
     }
-  }, [on])
+  }, [onWeather])
 
   const intensity = useMemo(() => conflictByCountry(events), [events])
   const stats = useMemo(() => deriveStats(events), [events])
@@ -288,13 +298,15 @@ export default function App() {
         />
 
         <section className="center">
-          <GlobeView
-            events={globeEvents}
-            markers={markers}
-            intensity={intensity}
-            radar={radar}
-            onSelect={setSelected}
-          />
+          <ErrorBoundary label="Globe">
+            <GlobeView
+              events={globeEvents}
+              markers={markers}
+              intensity={intensity}
+              radar={radar}
+              onSelect={setSelected}
+            />
+          </ErrorBoundary>
           <LayerPanel
             active={active}
             counts={counts}

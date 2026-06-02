@@ -5,6 +5,7 @@ import { KIND_COLOR, WORLD_GEOJSON, type GeoEvent } from '../feeds'
 import { ENTITY_COLOR, entityTitle, type Entity } from '../layers'
 import type { Aircraft, Ship } from '../layers'
 import type { RadarFrame } from '../weather'
+import { escapeHtml } from '../safe'
 
 interface Props {
   events: GeoEvent[] // conflict / quake / disaster (points + rings)
@@ -321,10 +322,11 @@ export default function GlobeView({
         polygonSideColor={() => 'rgba(180,30,30,0.08)'}
         polygonStrokeColor={() => 'rgba(120,150,190,0.25)'}
         polygonLabel={(d: any) => {
+          const name = escapeHtml(nameOf(d))
           const v = intensity[nameOf(d)] ?? 0
           return v
-            ? `<div class="tip"><b>${nameOf(d)}</b><br/>${v} conflict report(s)/24h</div>`
-            : `<div class="tip">${nameOf(d)}</div>`
+            ? `<div class="tip"><b>${name}</b><br/>${v} conflict report(s)/24h</div>`
+            : `<div class="tip">${name}</div>`
         }}
         // ---- event points (conflict / quake / disaster) ----
         pointsData={events}
@@ -336,7 +338,7 @@ export default function GlobeView({
         pointResolution={6}
         pointLabel={(d: any) => {
           const e = d as GeoEvent
-          return `<div class="tip"><b>${e.title}</b><br/>${e.detail}</div>`
+          return `<div class="tip"><b>${escapeHtml(e.title)}</b><br/>${escapeHtml(e.detail)}</div>`
         }}
         onPointClick={(d: any) => onSelect(d as GeoEvent)}
         // ---- entity sprites (aircraft / ship / camera / fire) ----
@@ -349,7 +351,7 @@ export default function GlobeView({
             : 0.012
         }
         objectThreeObject={(d: any) => spriteFor(d as Entity)}
-        objectLabel={(d: any) => `<div class="tip">${entityTitle(d as Entity)}</div>`}
+        objectLabel={(d: any) => `<div class="tip">${escapeHtml(entityTitle(d as Entity))}</div>`}
         onObjectClick={(d: any) => onSelect(d as Entity)}
         // ---- alert rings for the most severe events ----
         ringsData={events.filter((e) => e.weight > 0.55)}

@@ -39,7 +39,9 @@ interface Contact extends Ship {
 
 const fleet = new Map<string, Contact>()
 let ws: WebSocket | null = null
-let connected = false
+let wanted = false // the ship layer is on and we should stay connected
+let reconnectAt = 0 // backoff timer handle
+let backoff = 2000
 
 // Global-ish bounding boxes covering the major maritime theatres.
 const BOXES = [
@@ -47,11 +49,17 @@ const BOXES = [
 ]
 
 export function connectShips() {
-  if (!KEY || connected) return
-  connected = true
+  if (!KEY) return
+  wanted = true
+  openSocket()
+}
+
+function openSocket() {
+  if (!KEY || !wanted || ws) return // never open a second socket
   try {
     ws = new WebSocket('wss://stream.aisstream.io/v0/stream')
     ws.onopen = () => {
+      backoff = 2000 // reset backoff on a healthy connection
       ws?.send(
         JSON.stringify({
           APIKey: KEY,
@@ -100,29 +108,35 @@ export function connectShips() {
       }
     }
     ws.onclose = () => {
-      connected = false
       ws = null
+      // Auto-reconnect with capped backoff while the layer is still on.
+      if (wanted) {
+        clearTimeout(reconnectAt)
+        reconnectAt = setTimeout(openSocket, backoff) as unknown as number
+        backoff = Math.min(backoff * 2, 30_000)
+      }
     }
     ws.onerror = () => {
       try {
         ws?.close()
       } catch {
-        /* noop */
+        /* onclose handles reconnect */
       }
     }
   } catch {
-    connected = false
+    ws = null
   }
 }
 
 export function disconnectShips() {
+  wanted = false
+  clearTimeout(reconnectAt)
   try {
     ws?.close()
   } catch {
     /* noop */
   }
   ws = null
-  connected = false
 }
 
 /** Snapshot of vessels seen in the last 10 minutes, capped for legibility. */
