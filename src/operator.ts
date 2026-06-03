@@ -3,6 +3,8 @@
 // the background). Dev routes through the Vite proxy; packaged build hits the
 // loopback API directly.
 
+import { rawFetch } from './net'
+
 const DEV = import.meta.env.DEV
 const OLLAMA = DEV ? '/ollama' : 'http://127.0.0.1:11434'
 
@@ -15,10 +17,8 @@ export interface ChatMsg {
 
 export async function ollamaModel(): Promise<string | null> {
   try {
-    const r = await fetch(`${OLLAMA}/api/tags`, {
-      signal: AbortSignal.timeout(2500),
-    })
-    if (!r.ok) return null
+    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
+    if (!r || !r.ok) return null
     const j = await r.json()
     const names: string[] = (j?.models ?? []).map((m: any) => m.name)
     if (!names.length) return null
@@ -78,7 +78,7 @@ export async function forecastMarket(
         content: `QUESTION: ${question}\n\nLIVE SITUATION:\n${context}\n\nYour calibrated assessment:`,
       },
     ]
-    const r = await fetch(`${OLLAMA}/api/chat`, {
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -87,8 +87,9 @@ export async function forecastMarket(
         stream: false,
         options: { temperature: 0.5 },
       }),
+      ms: 120000,
     })
-    if (!r.ok) return null
+    if (!r || !r.ok) return null
     const j = await r.json()
     const text: string = j?.message?.content ?? ''
     const m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/)
@@ -117,12 +118,13 @@ export async function askOperator(
       { role: 'system', content: `${SYSTEM}\n\nCURRENT SITUATION:\n${context}` },
       ...history,
     ]
-    const r = await fetch(`${OLLAMA}/api/chat`, {
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages, stream: false }),
+      ms: 120000,
     })
-    if (!r.ok) return null
+    if (!r || !r.ok) return null
     const j = await r.json()
     return j?.message?.content ?? null
   } catch {

@@ -1,3 +1,5 @@
+import { getKey } from '../net'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -20,7 +22,7 @@ const KEYS: KeyInfo[] = [
     url: 'https://aisstream.io/',
     blurb:
       'Live global ship positions (cargo, tankers, naval). No reliable key-less source exists, so this layer needs a free AISStream key.',
-    present: !!import.meta.env.VITE_AISSTREAM_KEY,
+    present: !!getKey('VITE_AISSTREAM_KEY'),
   },
   {
     layer: 'Global wildfires / thermal',
@@ -29,7 +31,7 @@ const KEYS: KeyInfo[] = [
     url: 'https://firms.modaps.eosdis.nasa.gov/api/map_key/',
     blurb:
       'Wildfires already work key-less but cover the US only (NASA EONET). A free NASA FIRMS key adds dense GLOBAL VIIRS thermal detections.',
-    present: !!import.meta.env.VITE_FIRMS_KEY,
+    present: !!getKey('VITE_FIRMS_KEY'),
   },
 ]
 

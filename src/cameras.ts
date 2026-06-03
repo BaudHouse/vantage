@@ -5,6 +5,7 @@
 //     kept for geographic spread.
 
 import type { Camera } from './layers'
+import { rawFetch } from './net'
 
 const DEV = import.meta.env.DEV
 const CT = DEV ? '/feeds/caltrans' : 'https://cwwp2.dot.ca.gov'
@@ -14,16 +15,12 @@ const TFL = DEV ? '/feeds/tfl' : 'https://api.tfl.gov.uk'
 const NYC_IMG = 'https://webcams.nyctmc.org'
 
 async function tfetch(url: string, ms = 9000): Promise<any | null> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), ms)
+  const r = await rawFetch(url, { ms })
+  if (!r || !r.ok) return null
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
-    if (!r.ok) return null
     return await r.json()
   } catch {
     return null
-  } finally {
-    clearTimeout(t)
   }
 }
 

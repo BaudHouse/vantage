@@ -4,11 +4,12 @@
 // additionally pull the dense VIIRS thermal-pixel feed for far more detail.
 
 import type { Fire } from './layers'
+import { getKey, rawFetch } from './net'
 
 const DEV = import.meta.env.DEV
 const FIRMS = DEV ? '/feeds/firms' : 'https://firms.modaps.eosdis.nasa.gov'
 const EONET = DEV ? '/feeds/eonet' : 'https://eonet.gsfc.nasa.gov/api/v3'
-const KEY = import.meta.env.VITE_FIRMS_KEY as string | undefined
+const firmsKey = () => getKey('VITE_FIRMS_KEY')
 
 // The layer is always usable now (EONET needs no key). FIRMS just enriches it.
 export function firesEnabled(): boolean {
@@ -16,16 +17,17 @@ export function firesEnabled(): boolean {
 }
 
 export function firmsEnabled(): boolean {
-  return !!KEY
+  return !!firmsKey()
 }
 
 /** Keyless baseline: named active wildfires from NASA EONET. */
 async function fetchEonetFires(): Promise<Fire[]> {
   try {
-    const r = await fetch(`${EONET}/events?status=open&category=wildfires&limit=200`, {
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!r.ok) return []
+    const r = await rawFetch(
+      `${EONET}/events?status=open&category=wildfires&limit=200`,
+      { ms: 10000 },
+    )
+    if (!r || !r.ok) return []
     const j = await r.json()
     const out: Fire[] = []
     for (const e of j?.events ?? []) {
@@ -74,14 +76,13 @@ export async function fetchFires(): Promise<Fire[]> {
 }
 
 async function fetchFirms(): Promise<Fire[]> {
-  if (!KEY) return []
+  const key = firmsKey()
+  if (!key) return []
   // Global VIIRS NOAA-20, last 1 day.
-  const url = `${FIRMS}/api/area/csv/${KEY}/VIIRS_NOAA20_NRT/world/1`
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 12000)
+  const url = `${FIRMS}/api/area/csv/${key}/VIIRS_NOAA20_NRT/world/1`
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
-    if (!r.ok) return []
+    const r = await rawFetch(url, { ms: 12000 })
+    if (!r || !r.ok) return []
     const text = await r.text()
     if (!text.includes('latitude')) return []
     const rows = parseCsv(text)
@@ -108,7 +109,5 @@ async function fetchFirms(): Promise<Fire[]> {
     return out.slice(0, 600)
   } catch {
     return []
-  } finally {
-    clearTimeout(t)
   }
 }

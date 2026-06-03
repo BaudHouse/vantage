@@ -1,6 +1,8 @@
 // Live markets via Stooq free CSV quotes (no key). One request per symbol
 // (Stooq's multi-symbol light endpoint mangles output), fetched in parallel.
 
+import { rawFetch } from './net'
+
 const DEV = import.meta.env.DEV
 const STOOQ = DEV ? '/feeds/stooq' : 'https://stooq.com'
 
@@ -44,12 +46,10 @@ const SPECS: Spec[] = [
 ]
 
 async function one(spec: Spec): Promise<Quote | null> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 7000)
   try {
     const url = `${STOOQ}/q/l/?s=${spec.symbol}&f=sd2t2ohlc&h&e=csv`
-    const r = await fetch(url, { signal: ctrl.signal })
-    if (!r.ok) return null
+    const r = await rawFetch(url, { ms: 7000 })
+    if (!r || !r.ok) return null
     const txt = await r.text()
     const lines = txt.trim().split('\n')
     if (lines.length < 2) return null
@@ -69,8 +69,6 @@ async function one(spec: Spec): Promise<Quote | null> {
     }
   } catch {
     return null
-  } finally {
-    clearTimeout(t)
   }
 }
 

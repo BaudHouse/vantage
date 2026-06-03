@@ -6,6 +6,7 @@ import { ENTITY_COLOR, entityTitle, type Entity } from '../layers'
 import type { Aircraft, Ship } from '../layers'
 import type { RadarFrame } from '../weather'
 import { escapeHtml } from '../safe'
+import { rawFetch } from '../net'
 
 interface Props {
   events: GeoEvent[] // conflict / quake / disaster (points + rings)
@@ -240,9 +241,9 @@ export default function GlobeView({
   }, [])
 
   useEffect(() => {
-    fetch(WORLD_GEOJSON)
-      .then((r) => r.json())
-      .then((j) => setCountries(j.features ?? []))
+    rawFetch(WORLD_GEOJSON, { ms: 12000 })
+      .then((r) => (r && r.ok ? r.json() : null))
+      .then((j) => j && setCountries(j.features ?? []))
       .catch(() => {})
   }, [])
 

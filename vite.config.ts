@@ -5,6 +5,18 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/three')) return 'three'
+          if (id.includes('node_modules/react-globe.gl')) return 'globe'
+          if (id.includes('node_modules/three-globe')) return 'globe'
+        },
+      },
+    },
+  },
   server: {
     port: 5174,
     strictPort: true,

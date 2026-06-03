@@ -3,6 +3,7 @@
 // dense civilian metro boxes, dedupe, and normalize to the Aircraft entity.
 
 import type { Aircraft } from './layers'
+import { rawFetch } from './net'
 
 const DEV = import.meta.env.DEV
 const ADSB = DEV ? '/feeds/adsb' : 'https://api.adsb.lol'
@@ -27,16 +28,12 @@ const BOXES: [number, number, number][] = [
 ]
 
 async function tfetch(url: string, ms = 9000): Promise<any | null> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), ms)
+  const r = await rawFetch(url, { ms })
+  if (!r || !r.ok) return null
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
-    if (!r.ok) return null
     return await r.json()
   } catch {
     return null
-  } finally {
-    clearTimeout(t)
   }
 }
 

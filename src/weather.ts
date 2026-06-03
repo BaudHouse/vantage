@@ -2,6 +2,8 @@
 // expose the latest radar frame's tile-URL template; GlobeView paints those
 // tiles onto the globe as a precipitation overlay.
 
+import { rawFetch } from './net'
+
 const DEV = import.meta.env.DEV
 const RV = DEV ? '/feeds/rainviewer' : 'https://api.rainviewer.com'
 
@@ -13,10 +15,8 @@ export interface RadarFrame {
 
 export async function fetchRadarFrame(): Promise<RadarFrame | null> {
   try {
-    const r = await fetch(`${RV}/public/weather-maps.json`, {
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!r.ok) return null
+    const r = await rawFetch(`${RV}/public/weather-maps.json`, { ms: 8000 })
+    if (!r || !r.ok) return null
     const j = await r.json()
     const past: { time: number; path: string }[] = j?.radar?.past ?? []
     const last = past[past.length - 1]

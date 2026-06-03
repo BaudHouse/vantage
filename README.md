@@ -1,73 +1,76 @@
-# React + TypeScript + Vite
+# VANTAGE
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**A live, global common operating picture for conflict & risk — fused from free,
+mostly key-less data, with a local-AI analyst.** A 3D globe overlays real-time
+conflict, seismic, disaster, aircraft, vessel, wildfire, traffic-camera and
+weather-radar layers, and a local Ollama model reasons over all of it.
 
-Currently, two official plugins are available:
+> Think "a self-hostable, $0-data-cost Palantir-lite for open-source intelligence."
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Why it's interesting
 
-## React Compiler
+- **Key-less multi-INT fusion.** Most layers need **no API key at all** — GDELT
+  (conflict wire), USGS (seismic), NASA EONET (disasters/wildfires), adsb.lol
+  (ADS-B aircraft incl. military), NYC DOT + Caltrans (live traffic cams),
+  RainViewer (weather radar), Stooq (defense/commodity/FX tape). Two optional
+  free keys unlock global thermal (NASA FIRMS) and AIS vessels.
+- **Headline geocoding (the moat).** GDELT only tells you the *publisher's*
+  country. Vantage reads the actual dateline out of each headline via a
+  conflict-zone gazetteer, so a US outlet covering Kyiv plots in **Ukraine, not
+  Washington** — and only *precisely-located* events color the heatmap. This is
+  unit-tested (`src/gazetteer.test.ts`).
+- **Local-AI analyst.** An Ollama model (qwen2.5) acts as an all-source analyst
+  (BLUF-first, fact-vs-assessment, confidence) over every active layer, plus
+  per-market AI forecasts — **zero inference cost, fully private, no per-token
+  economics.**
+- **Click any entity → dossier.** Full attributes per aircraft/vessel/fire/cam
+  (with live image), an "Ask Operator about this" action, and a searchable
+  camera gallery.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Architecture
 
-## Expanding the ESLint configuration
+- **Vite + React 19 + TypeScript**, `react-globe.gl` + `three` for the globe
+  (lazy-loaded; initial bundle ~81 kB gzip, globe in a separate async chunk).
+- **Feeds**: dev routes through the Vite proxy (CORS); a packaged **Electron**
+  build routes every fetch through an **allow-listed main-process handler** so
+  the renderer keeps `webSecurity: true`.
+- **Secrets**: optional keys are loaded **at runtime** from `userData/keys.json`
+  (or env) via a `contextBridge` — **never baked into the web bundle**.
+- **Resilience**: AbortController timeouts, `Promise.allSettled`, GDELT
+  rate-limit backoff + last-good cache, AIS auto-reconnect, React error
+  boundaries, output escaping (`escapeHtml`/`safeUrl`) on all feed/LLM data.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Run
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev            # http://localhost:5174  (browser)
+npm run electron:dev   # desktop app
+npm test               # vitest (gazetteer, choropleth, XSS guards)
+npm run build          # type-checked production build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Optional free keys
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Local dev: put them in `.env.local` (gitignored):
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_FIRMS_KEY=…       # global thermal — firms.modaps.eosdis.nasa.gov/api/map_key/
+VITE_AISSTREAM_KEY=…   # live vessels  — aisstream.io
+```
+
+For a **distributed desktop build**, build *without* `.env.local` and ship keys
+in `userData/keys.json` — they load at runtime and stay off the bundle.
+
+## Honest limitations
+
+- AIS vessels and global FIRMS thermal genuinely require a free key (no reliable
+  key-less global source exists). The keyless wildfire baseline (EONET) is
+  US-centric.
+- The gazetteer covers the major active conflict zones; obscure datelines fall
+  back to publisher country (clearly labeled in the feed).
+- The 1.8 MB globe chunk (three.js) loads after first paint — fine for desktop.
+
+## Data sources
+GDELT · USGS · NASA EONET · NASA FIRMS · adsb.lol · AISStream · NYC DOT ·
+Caltrans · RainViewer · Stooq · Natural Earth · Ollama (local)

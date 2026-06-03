@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { conflictByCountry, deriveStats, fetchAll, type GeoEvent } from './feeds'
 import { fetchMarkets, type Quote } from './markets'
 import { fetchAircraft } from './aircraft'
@@ -21,7 +29,9 @@ import {
   situationContext,
   type Briefing,
 } from './briefing'
-import GlobeView from './components/GlobeView'
+// Lazy-loaded: keeps three.js + react-globe.gl (the bulk of the bundle) out of
+// the initial chunk so the shell + side rails paint immediately.
+const GlobeView = lazy(() => import('./components/GlobeView'))
 import PulseFeed from './components/PulseFeed'
 import RightRail from './components/RightRail'
 import Ticker from './components/Ticker'
@@ -299,13 +309,17 @@ export default function App() {
 
         <section className="center">
           <ErrorBoundary label="Globe">
-            <GlobeView
-              events={globeEvents}
-              markers={markers}
-              intensity={intensity}
-              radar={radar}
-              onSelect={setSelected}
-            />
+            <Suspense
+              fallback={<div className="globe-loading">◍ initializing globe…</div>}
+            >
+              <GlobeView
+                events={globeEvents}
+                markers={markers}
+                intensity={intensity}
+                radar={radar}
+                onSelect={setSelected}
+              />
+            </Suspense>
           </ErrorBoundary>
           <LayerPanel
             active={active}

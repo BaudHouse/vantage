@@ -5,11 +5,12 @@
 // layer is a no-op and the UI flags it.
 
 import type { Ship } from './layers'
+import { getKey } from './net'
 
-const KEY = import.meta.env.VITE_AISSTREAM_KEY as string | undefined
+const aisKey = (): string | undefined => getKey('VITE_AISSTREAM_KEY')
 
 export function shipsEnabled(): boolean {
-  return !!KEY
+  return !!aisKey()
 }
 
 // AIS ship-type code -> readable class (coarse buckets).
@@ -49,20 +50,21 @@ const BOXES = [
 ]
 
 export function connectShips() {
-  if (!KEY) return
+  if (!aisKey()) return
   wanted = true
   openSocket()
 }
 
 function openSocket() {
-  if (!KEY || !wanted || ws) return // never open a second socket
+  const key = aisKey()
+  if (!key || !wanted || ws) return // never open a second socket
   try {
     ws = new WebSocket('wss://stream.aisstream.io/v0/stream')
     ws.onopen = () => {
       backoff = 2000 // reset backoff on a healthy connection
       ws?.send(
         JSON.stringify({
-          APIKey: KEY,
+          APIKey: key,
           BoundingBoxes: BOXES,
           FilterMessageTypes: ['PositionReport', 'ShipStaticData'],
         }),

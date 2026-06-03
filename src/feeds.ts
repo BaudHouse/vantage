@@ -6,6 +6,7 @@
 //   disaster  -> NASA EONET (satellite-tracked natural events)
 
 import { resolvePlace, type Resolved } from './gazetteer'
+import { rawFetch } from './net'
 
 export type EventKind = 'conflict' | 'quake' | 'disaster'
 
@@ -43,17 +44,10 @@ const BASE = DEV
       eonet: 'https://eonet.gsfc.nasa.gov/api/v3',
     }
 
-/** fetch with a hard timeout so one slow/stalled feed can't block the globe. */
-async function tfetch(url: string, ms = 8000): Promise<Response | null> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), ms)
-  try {
-    return await fetch(url, { signal: ctrl.signal })
-  } catch {
-    return null
-  } finally {
-    clearTimeout(t)
-  }
+/** fetch with a hard timeout so one slow/stalled feed can't block the globe.
+ *  Routes through Electron main in a packaged build (see net.ts). */
+function tfetch(url: string, ms = 8000): Promise<Response | null> {
+  return rawFetch(url, { ms })
 }
 
 // Approx country centroids (lat, lng) for GDELT source-country geocoding.
