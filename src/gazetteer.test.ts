@@ -43,4 +43,15 @@ describe('resolvePlace — the headline-geocoding moat', () => {
     const r = resolvePlace('New magazine launches in Ohio', 'United States', centroid)
     expect(r?.precise).toBe(false)
   })
+
+  it('resolves a country named in the headline (precise, not publisher)', () => {
+    const r = resolvePlace('France pledges more aid amid protests', 'United States', centroid)
+    expect(r?.country).toBe('France')
+    expect(r?.precise).toBe(true)
+  })
+
+  it('prefers a specific city over the country also named', () => {
+    const r = resolvePlace('Drone strike on Kyiv, Ukraine says', 'United States', centroid)
+    expect(r?.place).toBe('Kyiv') // city beats the country mention
+  })
 })
