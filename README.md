@@ -1,5 +1,7 @@
 # VANTAGE
 
+[![CI](https://github.com/Bikebrainz/vantage/actions/workflows/ci.yml/badge.svg)](https://github.com/Bikebrainz/vantage/actions/workflows/ci.yml)
+
 **A live, global common operating picture for conflict & risk — fused from free,
 mostly key-less data, with a local-AI analyst.** A 3D globe overlays real-time
 conflict, seismic, disaster, aircraft, vessel, wildfire, traffic-camera and
