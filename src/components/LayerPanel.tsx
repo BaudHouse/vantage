@@ -41,6 +41,8 @@ export default function LayerPanel({
           className="lp-collapse"
           onClick={toggleOpen}
           title={open ? 'Collapse layers' : 'Expand layers'}
+          aria-label={open ? 'Collapse layer panel' : 'Expand layer panel'}
+          aria-expanded={open}
         >
           <span className={`lp-chev ${open ? 'open' : ''}`}>▸</span>
           LAYERS
@@ -50,6 +52,7 @@ export default function LayerPanel({
           className="lp-keys"
           onClick={onKeySetup}
           title="Unlock keyed layers"
+          aria-label="Set up free API keys for keyed layers"
         >
           🔑
         </button>

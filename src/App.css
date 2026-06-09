@@ -17,6 +17,13 @@
 
 * { box-sizing: border-box; }
 
+/* Visible keyboard-focus ring (dark UI hides the browser default). */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 html, body, #root {
   margin: 0;
   height: 100%;

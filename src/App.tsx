@@ -564,6 +564,8 @@ export default function App() {
             className={`navbtn icon ${focusMode ? 'on' : ''}`}
             onClick={onToggleFocus}
             title="Full-globe focus mode (f) — hide both side rails"
+            aria-label="Toggle full-globe focus mode"
+            aria-pressed={focusMode}
           >
             ⛶
           </button>
@@ -577,6 +579,8 @@ export default function App() {
                 ? 'Switch to compact density'
                 : 'Switch to cozy density'
             }
+            aria-label="Toggle compact density"
+            aria-pressed={density === 'compact'}
           >
             ⇲
           </button>
@@ -584,6 +588,7 @@ export default function App() {
             className="navbtn icon"
             onClick={() => setHelpOpen(true)}
             title="Keyboard shortcuts (?)"
+            aria-label="Show keyboard shortcuts"
           >
             ?
           </button>
@@ -620,6 +625,7 @@ export default function App() {
               className="rail-collapse left"
               onClick={() => setLeftOpen(false)}
               title="Collapse feed"
+              aria-label="Collapse live-feed rail"
             >
               ‹
             </button>
@@ -661,6 +667,7 @@ export default function App() {
               className="rail-reopen left"
               onClick={() => setLeftOpen(true)}
               title="Show live feed"
+              aria-label="Show live-feed rail"
             >
               ›
             </button>
@@ -670,6 +677,7 @@ export default function App() {
               className="rail-reopen right"
               onClick={() => setRightOpen(true)}
               title="Show markets"
+              aria-label="Show markets rail"
             >
               ‹
             </button>
@@ -717,6 +725,7 @@ export default function App() {
               className="rail-collapse right"
               onClick={() => setRightOpen(false)}
               title="Collapse markets"
+              aria-label="Collapse markets rail"
             >
               ›
             </button>
@@ -742,7 +751,13 @@ export default function App() {
       <TrendsModal open={trendsOpen} onClose={() => setTrendsOpen(false)} />
       {helpOpen && (
         <div className="modal" onClick={() => setHelpOpen(false)}>
-          <div className="help-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="help-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Keyboard shortcuts"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="help-head">
               <div>
                 <span className="help-kicker">QUICK REFERENCE</span>
