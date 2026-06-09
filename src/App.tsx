@@ -493,6 +493,7 @@ export default function App() {
         <nav className="topnav">
           <span className="live">● LIVE</span>
           <span className="viewers">👁 {viewers}</span>
+          <span className="nav-sep" />
           <button className="navbtn" onClick={openCameras}>
             📷 CAMS
           </button>
@@ -569,16 +570,11 @@ export default function App() {
           )}
           <div className="botbar">
             <span className="bb-item">
-              <b className="up">{shownEvents.length + markers.length}</b> SIGNALS
-            </span>
-            <span className="bb-item">
-              <b className="active">{stats.active}</b> ACTIVE
-            </span>
-            <span className="bb-item">
-              ✈ <b>{aircraft.length}</b> AIR
+              <b className="up">{shownEvents.length + markers.length}</b> live
+              signals
             </span>
             <span className="bb-src">
-              GDELT · USGS · EONET · ADS-B · FIRMS · AIS · CALTRANS · RAINVIEWER · STOOQ
+              GDELT · USGS · EONET · ADS-B · FIRMS · AIS · RAINVIEWER
             </span>
           </div>
         </section>

@@ -13,15 +13,69 @@
   font-size: 12px;
   user-select: none;
 }
+.layer-panel.collapsed {
+  width: auto;
+  padding: 6px 8px;
+}
 .lp-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   color: #7d8aa0;
-  letter-spacing: 2px;
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 4px 6px;
+  padding: 1px 2px;
+}
+.layer-panel:not(.collapsed) .lp-head {
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.lp-collapse {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+.lp-collapse:hover {
+  color: #aeb9cc;
+}
+.lp-chev {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+.lp-chev.open {
+  transform: rotate(90deg);
+}
+.lp-on {
+  color: #3ddc97;
+  font-style: normal;
+  letter-spacing: 1px;
+}
+.lp-group {
+  margin-top: 8px;
+}
+.lp-group:first-of-type {
+  margin-top: 2px;
+}
+.lp-group-title {
+  color: #4f5d72;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 6px 3px;
 }
 .lp-keys {
   background: none;
@@ -205,7 +259,7 @@
   background: none;
   border: none;
   color: #c8d2e2;
-  padding: 5px 6px;
+  padding: 4px 6px;
   border-radius: 7px;
   cursor: pointer;
   text-align: left;
