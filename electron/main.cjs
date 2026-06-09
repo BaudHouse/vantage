@@ -17,6 +17,8 @@ const ALLOWED_HOSTS = new Set([
   'www.seismicportal.eu', 'api.safecast.org', 'api.weather.gov',
   'api.wheretheiss.at', 'api.coingecko.com',
   'api.waqi.info', 'api.windy.com', 'webcams.windy.com',
+  // camera image hosts (for vision analysis)
+  'imgproxy.windy.com', 's3-eu-west-1.amazonaws.com', 'api.tfl.gov.uk',
   '127.0.0.1', 'localhost', // local Ollama
 ])
 
@@ -54,6 +56,20 @@ ipcMain.handle('net:fetch', async (_e, req) => {
     return { ok: r.ok, status: r.status, text: await r.text() }
   } catch {
     return { ok: false, status: 0, text: '' }
+  }
+})
+
+// Fetch an image (any allow-listed host) and return base64 — for feeding camera
+// frames to the local vision model.
+ipcMain.handle('net:image', async (_e, url) => {
+  try {
+    const u = new URL(url)
+    if (!ALLOWED_HOSTS.has(u.hostname)) return null
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    if (!r.ok) return null
+    return Buffer.from(await r.arrayBuffer()).toString('base64')
+  } catch {
+    return null
   }
 })
 

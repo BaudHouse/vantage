@@ -32,6 +32,64 @@ export async function ollamaModel(): Promise<string | null> {
   }
 }
 
+// Vision-capable Ollama models, in preference order.
+const VISION_MODELS = [
+  'qwen2.5vl', 'qwen2-vl', 'llama3.2-vision', 'llava-llama3', 'llava',
+  'minicpm-v', 'bakllava', 'moondream',
+]
+
+export async function visionModel(): Promise<string | null> {
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    const names: string[] = (j?.models ?? []).map((m: any) => m.name)
+    for (const v of VISION_MODELS) {
+      const hit = names.find((n) => n.toLowerCase().includes(v))
+      if (hit) return hit
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const VISION_SYSTEM = `You are VANTAGE Operator analyzing a live camera frame for
+situational awareness. Report ONLY what is visible. Cover, where applicable:
+traffic flow/congestion, road/surface conditions, weather & visibility, daylight/
+night, pedestrians/crowd activity, vehicles of note, any incident, hazard, or
+anomaly, and an overall one-line assessment. Be specific and concise; never
+invent detail you cannot see.`
+
+/** Send a camera frame (base64) to the local vision model for analysis. */
+export async function analyzeImage(
+  model: string,
+  imageBase64: string,
+  context: string,
+): Promise<string | null> {
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: VISION_SYSTEM },
+          { role: 'user', content: context, images: [imageBase64] },
+        ],
+        stream: false,
+        options: { temperature: 0.3 },
+      }),
+      ms: 180000,
+    })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    return j?.message?.content ?? null
+  } catch {
+    return null
+  }
+}
+
 const SYSTEM = `You are VANTAGE Operator — a senior all-source intelligence analyst
 running point on a live global common operating picture. Your feeds: GDELT
 conflict wire, USGS seismic, NASA EONET disasters, NASA FIRMS thermal/fire

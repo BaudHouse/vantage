@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Camera } from '../layers'
+import { fetchImageBase64 } from '../net'
+import { analyzeImage, visionModel } from '../operator'
+import Markdown from './Markdown'
 
 interface Props {
   cameras: Camera[]
@@ -17,6 +20,39 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
   const [tick, setTick] = useState(0)
   const [lbTick, setLbTick] = useState(0)
   const [zoom, setZoom] = useState<Camera | null>(null)
+  const [vBusy, setVBusy] = useState(false)
+  const [vResult, setVResult] = useState<string | null>(null)
+  const [vErr, setVErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    setVResult(null)
+    setVErr(null)
+  }, [zoom])
+
+  const analyzeCam = async (cam: Camera) => {
+    setVBusy(true)
+    setVErr(null)
+    setVResult(null)
+    const model = await visionModel()
+    if (!model) {
+      setVErr('No vision model. Run `ollama pull qwen2.5vl:7b`.')
+      setVBusy(false)
+      return
+    }
+    const b64 = await fetchImageBase64(cam.image)
+    if (!b64) {
+      setVErr('Could not capture the frame.')
+      setVBusy(false)
+      return
+    }
+    const out = await analyzeImage(
+      model,
+      b64,
+      `Analyze this live camera at ${cam.name}${cam.region ? ` (${cam.region})` : ''}.`,
+    )
+    setVResult(out ?? '⚠ Vision model unreachable.')
+    setVBusy(false)
+  }
 
   // Thumbnails refresh every ~12s to stay current without hammering.
   useEffect(() => {
@@ -165,6 +201,21 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
               >
                 open {zoom.video ? 'video' : 'full image'} ↗
               </a>
+            </div>
+            <div className="vision" style={{ padding: '0 15px 14px' }}>
+              <button
+                className="vision-btn"
+                onClick={() => analyzeCam(zoom)}
+                disabled={vBusy}
+              >
+                {vBusy ? '◍ analyzing frame…' : '🔍 AI analyze this frame'}
+              </button>
+              {vErr && <div className="vision-err">⚠ {vErr}</div>}
+              {vResult && (
+                <div className="vision-out">
+                  <Markdown text={vResult} />
+                </div>
+              )}
             </div>
           </div>
         </div>

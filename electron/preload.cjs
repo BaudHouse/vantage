@@ -14,5 +14,6 @@ try {
 
 contextBridge.exposeInMainWorld('vantage', {
   netFetch: (req) => ipcRenderer.invoke('net:fetch', req),
+  fetchImage: (url) => ipcRenderer.invoke('net:image', url),
   keys,
 })

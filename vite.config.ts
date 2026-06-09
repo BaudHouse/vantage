@@ -1,10 +1,40 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+// Dev-only middleware: fetch any image server-side (Node has no CORS) so the
+// renderer can grab camera frames to base64 for the vision model. In a packaged
+// build this job is done by the Electron main process (electron/main.cjs).
+function imgProxy(): Plugin {
+  return {
+    name: 'vantage-imgproxy',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/imgproxy?')) return next()
+        const target = new URL(req.url, 'http://x').searchParams.get('url')
+        if (!target || !/^https?:\/\//.test(target)) {
+          res.statusCode = 400
+          return res.end('bad url')
+        }
+        fetch(target)
+          .then(async (r) => {
+            const buf = Buffer.from(await r.arrayBuffer())
+            res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg')
+            res.setHeader('Cache-Control', 'no-store')
+            res.end(buf)
+          })
+          .catch(() => {
+            res.statusCode = 502
+            res.end('fetch failed')
+          })
+      })
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(), imgProxy()],
   build: {
     chunkSizeWarningLimit: 1200,
     rollupOptions: {

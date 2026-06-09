@@ -17,6 +17,9 @@ import type { GeoEvent } from '../feeds'
 
 const clip = (s: string, n = 16) => (s ? s.slice(0, n).replace('T', ' ') : '—')
 import { safeUrl } from '../safe'
+import { fetchImageBase64 } from '../net'
+import { analyzeImage, visionModel } from '../operator'
+import Markdown from './Markdown'
 
 interface Props {
   entity: Entity | null
@@ -100,6 +103,40 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
     const t = setInterval(() => setTick((n) => n + 1), ms)
     return () => clearInterval(t)
   }, [entity])
+
+  // Vision analysis of the camera frame.
+  const [vBusy, setVBusy] = useState(false)
+  const [vResult, setVResult] = useState<string | null>(null)
+  const [vErr, setVErr] = useState<string | null>(null)
+  useEffect(() => {
+    setVResult(null)
+    setVErr(null)
+  }, [entity])
+
+  const analyzeCam = async (cam: Camera) => {
+    setVBusy(true)
+    setVErr(null)
+    setVResult(null)
+    const model = await visionModel()
+    if (!model) {
+      setVErr('No vision model found. Run `ollama pull qwen2.5vl:7b`.')
+      setVBusy(false)
+      return
+    }
+    const b64 = await fetchImageBase64(cam.image)
+    if (!b64) {
+      setVErr('Could not capture the camera frame.')
+      setVBusy(false)
+      return
+    }
+    const out = await analyzeImage(
+      model,
+      b64,
+      `Analyze this live camera at ${cam.name}${cam.region ? ` (${cam.region})` : ''}.`,
+    )
+    setVResult(out ?? '⚠ Vision model unreachable.')
+    setVBusy(false)
+  }
 
   if (!entity) return null
   const e = entity
@@ -222,6 +259,24 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
             <img src={liveImg} alt="live camera" loading="lazy" />
           )}
           <span className="cam-live">● LIVE</span>
+        </div>
+      )}
+
+      {e.kind === 'camera' && (
+        <div className="vision">
+          <button
+            className="vision-btn"
+            onClick={() => analyzeCam(e as Camera)}
+            disabled={vBusy}
+          >
+            {vBusy ? '◍ analyzing frame…' : '🔍 AI analyze this frame'}
+          </button>
+          {vErr && <div className="vision-err">⚠ {vErr}</div>}
+          {vResult && (
+            <div className="vision-out">
+              <Markdown text={vResult} />
+            </div>
+          )}
         </div>
       )}
 

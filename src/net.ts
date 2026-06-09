@@ -14,6 +14,7 @@ interface Bridge {
     headers?: Record<string, string>
     body?: string
   }) => Promise<{ ok: boolean; status: number; text: string }>
+  fetchImage?: (url: string) => Promise<string | null>
   keys?: Record<string, string>
 }
 
@@ -58,6 +59,30 @@ export type KeyName =
   | 'VITE_AISSTREAM_KEY'
   | 'VITE_WAQI_KEY'
   | 'VITE_WINDY_KEY'
+
+function bufToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+/** Fetch any image and return raw base64 (no data: prefix) — for feeding camera
+ *  frames to the local vision model. Electron uses the main process; dev uses
+ *  the /imgproxy middleware so cross-origin/no-CORS hosts still work. */
+export async function fetchImageBase64(url: string): Promise<string | null> {
+  if (bridge?.fetchImage) return bridge.fetchImage(url)
+  try {
+    const r = await fetch(`/imgproxy?url=${encodeURIComponent(url)}`)
+    if (!r.ok) return null
+    return bufToBase64(await r.arrayBuffer())
+  } catch {
+    return null
+  }
+}
 
 /** Read an API key at runtime — from the Electron main process if present,
  *  else from Vite env (static access so Vite can inline it in dev). */
