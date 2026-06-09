@@ -145,28 +145,46 @@ export function windyEnabled(): boolean {
   return !!getKey('VITE_WINDY_KEY')
 }
 
-async function fetchWindy(limit = 300): Promise<Camera[]> {
+// Windy's free tier caps `limit` at 50 per request, so we paginate. The cam
+// LIST is static, so cache it for 30 min to stay well within the free quota
+// (the JPEG images themselves still refresh live in the gallery/dossier).
+let windyCache: Camera[] = []
+let windyAt = 0
+const WINDY_PAGES = 4 // 4 x 50 = 200 global webcams
+
+async function fetchWindy(): Promise<Camera[]> {
   const key = getKey('VITE_WINDY_KEY')
   if (!key) return []
-  try {
-    const r = await rawFetch(
-      `${WINDY}/webcams/api/v3/webcams?limit=${limit}&include=location,images`,
-      { ms: 10000, headers: { 'x-windy-api-key': key } },
-    )
-    if (!r || !r.ok) return []
-    const j = await r.json()
-    const list: any[] = j?.webcams ?? []
-    const out: Camera[] = []
-    for (const w of list) {
+  if (Date.now() - windyAt < 30 * 60_000 && windyCache.length) return windyCache
+  const headers = { 'x-windy-api-key': key }
+  const reqs = Array.from({ length: WINDY_PAGES }, (_, i) =>
+    rawFetch(
+      `${WINDY}/webcams/api/v3/webcams?limit=50&offset=${i * 50}&include=location,images`,
+      { ms: 10000, headers },
+    ),
+  )
+  const out: Camera[] = []
+  const seen = new Set<string>()
+  for (const p of await Promise.allSettled(reqs)) {
+    if (p.status !== 'fulfilled' || !p.value || !p.value.ok) continue
+    let j: any
+    try {
+      j = await p.value.json()
+    } catch {
+      continue
+    }
+    for (const w of j?.webcams ?? []) {
       const lat = Number(w?.location?.latitude)
       const lng = Number(w?.location?.longitude)
       const img = w?.images?.current?.preview || w?.images?.daylight?.preview
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !img) continue
+      const id = `windy-${w.webcamId}`
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !img || seen.has(id)) continue
+      seen.add(id)
       const country = w?.location?.country ?? ''
       const city = w?.location?.city ?? ''
       out.push({
         kind: 'camera',
-        id: `windy-${w.webcamId}`,
+        id,
         lat,
         lng,
         name: w.title ?? city ?? 'Webcam',
@@ -177,10 +195,12 @@ async function fetchWindy(limit = 300): Promise<Camera[]> {
         live: false,
       })
     }
-    return out
-  } catch {
-    return []
   }
+  if (out.length) {
+    windyCache = out
+    windyAt = Date.now()
+  }
+  return out
 }
 
 export async function fetchCameras(): Promise<Camera[]> {
