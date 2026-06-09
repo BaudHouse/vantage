@@ -96,8 +96,6 @@ export default function App() {
   const [viewers] = useState(() => 90 + Math.floor(Math.random() * 60))
   const askN = useRef(0)
 
-  const on = useCallback((id: LayerId) => active.has(id), [active])
-
   // Stable per-layer booleans so a polling effect only re-runs when ITS layer
   // toggles — not on every unrelated layer change (which would tear down and
   // reconnect the AIS websocket each time).
@@ -381,13 +379,25 @@ export default function App() {
   const getContext = useCallback(
     () =>
       situationContext(events, markets, {
-        aircraft: on('aircraft') ? aircraft : [],
-        ships: on('ship') ? ships : [],
-        cameras: on('camera') ? cameras : [],
-        fires: on('fire') ? fires : [],
-        weatherOn: on('weather'),
+        aircraft: onAircraft ? aircraft : [],
+        ships: onShip ? ships : [],
+        cameras: onCamera ? cameras : [],
+        fires: onFire ? fires : [],
+        weatherOn: onWeather,
+        hazards: onHazard ? hazards : [],
+        storms: onStorm ? storms : [],
+        volcanoes: onVolcano ? volcanoes : [],
+        wxAlerts: onAlert ? wxAlerts : [],
+        radiation: onRadiation ? radiation : [],
+        satellites: onSatellite ? satellites : [],
+        airQuality: onAirQuality ? airQuality : [],
       }),
-    [events, markets, on, aircraft, ships, cameras, fires],
+    [
+      events, markets, onAircraft, onShip, onCamera, onFire, onWeather,
+      onHazard, onStorm, onVolcano, onAlert, onRadiation, onSatellite, onAirQuality,
+      aircraft, ships, cameras, fires, hazards, storms, volcanoes, wxAlerts,
+      radiation, satellites, airQuality,
+    ],
   )
 
   const askAbout = (e: Entity) => {

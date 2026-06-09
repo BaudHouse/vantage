@@ -90,6 +90,44 @@ export async function analyzeImage(
   }
 }
 
+const AREA_SYSTEM = `You are VANTAGE Operator producing a SITUATIONAL REPORT from
+several live cameras in one area. The images are separate cameras, named in order
+in the prompt. For each, note key observations (traffic, weather, activity,
+anomalies). Then give an OVERALL AREA ASSESSMENT and a one-line BOTTOM LINE.
+Be concise and structured (use the camera names as headers). Report only what is
+visible across the frames.`
+
+/** Analyze several camera frames at once into a combined area report. */
+export async function analyzeArea(
+  model: string,
+  images: string[],
+  context: string,
+): Promise<string | null> {
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: AREA_SYSTEM },
+          { role: 'user', content: context, images },
+        ],
+        stream: false,
+        // Several images + a structured report need a big context window;
+        // Ollama's default is too small and silently truncates/errors.
+        options: { temperature: 0.3, num_ctx: 16384 },
+      }),
+      ms: 240000,
+    })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    return j?.message?.content ?? null
+  } catch {
+    return null
+  }
+}
+
 const SYSTEM = `You are VANTAGE Operator — a senior all-source intelligence analyst
 running point on a live global common operating picture. Your feeds: GDELT
 conflict wire, USGS seismic, NASA EONET disasters, NASA FIRMS thermal/fire

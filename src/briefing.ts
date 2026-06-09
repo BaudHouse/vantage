@@ -66,7 +66,20 @@ export function buildBriefing(events: GeoEvent[], markets: Quote[]): Briefing {
   }
 }
 
-import type { Aircraft, Ship, Camera, Fire, Entity } from './layers'
+import type {
+  Aircraft,
+  Ship,
+  Camera,
+  Fire,
+  Entity,
+  Hazard,
+  Storm,
+  Volcano,
+  WxAlert,
+  Radiation,
+  Satellite,
+  AirQuality,
+} from './layers'
 import { entityTitle } from './layers'
 
 export interface LayerSnapshot {
@@ -75,6 +88,13 @@ export interface LayerSnapshot {
   cameras?: Camera[]
   fires?: Fire[]
   weatherOn?: boolean
+  hazards?: Hazard[]
+  storms?: Storm[]
+  volcanoes?: Volcano[]
+  wxAlerts?: WxAlert[]
+  radiation?: Radiation[]
+  satellites?: Satellite[]
+  airQuality?: AirQuality[]
 }
 
 /** Full multi-INT situation brief fed to the Operator analyst. */
@@ -128,8 +148,68 @@ export function situationContext(
     )
   }
 
+  const hazards = layers.hazards ?? []
+  if (hazards.length) {
+    const red = hazards.filter((h) => /red/i.test(h.severity))
+    const orange = hazards.filter((h) => /orange/i.test(h.severity))
+    const byType = [...new Set(hazards.map((h) => h.hazardType))].join('/')
+    lines.push(
+      `HAZARD ALERTS (GDACS): ${hazards.length} active (${byType}) — ${red.length} RED, ${orange.length} orange.` +
+        (red.length
+          ? ` Red: ${red.slice(0, 5).map((h) => `${h.hazardType} ${h.country}`).join(', ')}.`
+          : ''),
+    )
+  }
+
+  const storms = layers.storms ?? []
+  if (storms.length) {
+    lines.push(
+      `TROPICAL CYCLONES (NHC): ${storms.length} active — ${storms.map((s) => `${s.name}(${s.classification || '?'}, ${s.intensityMph || '?'}mph)`).join(', ')}.`,
+    )
+  }
+
+  const volcanoes = layers.volcanoes ?? []
+  if (volcanoes.length) {
+    lines.push(
+      `VOLCANOES (USGS): ${volcanoes.length} at elevated alert — ${volcanoes.slice(0, 6).map((v) => `${v.name}(${v.level})`).join(', ')}.`,
+    )
+  }
+
+  const wx = layers.wxAlerts ?? []
+  if (wx.length) {
+    const ext = wx.filter((a) => /extreme/i.test(a.severity))
+    const types = [...new Set(wx.map((a) => a.event))].slice(0, 6).join(', ')
+    lines.push(
+      `SEVERE WEATHER (NWS, US): ${wx.length} active severe/extreme alerts${ext.length ? `, ${ext.length} EXTREME` : ''} — ${types}.`,
+    )
+  }
+
+  const rad = layers.radiation ?? []
+  if (rad.length) {
+    const hot = [...rad].sort((a, c) => c.value - a.value)[0]
+    lines.push(
+      `RADIATION (Safecast): ${rad.length} sensors${hot ? `, peak ${hot.value} ${hot.unit} @ ${hot.location || '?'}` : ''}.`,
+    )
+  }
+
+  const aq = layers.airQuality ?? []
+  if (aq.length) {
+    const bad = aq.filter((a) => a.aqi > 150)
+    const worst = [...aq].sort((a, c) => c.aqi - a.aqi)[0]
+    lines.push(
+      `AIR QUALITY (WAQI): ${aq.length} stations, ${bad.length} unhealthy (AQI>150)${worst ? `, worst AQI ${worst.aqi} @ ${worst.location || '?'}` : ''}.`,
+    )
+  }
+
+  const sats = layers.satellites ?? []
+  if (sats.length) {
+    lines.push(
+      `SPACE: ${sats.map((s) => `${s.name} @ ${s.lat.toFixed(1)},${s.lng.toFixed(1)} (${s.altitude}km)`).join('; ')}.`,
+    )
+  }
+
   const cams = layers.cameras ?? []
-  if (cams.length) lines.push(`TRAFFIC CAMS: ${cams.length} live feeds available.`)
+  if (cams.length) lines.push(`TRAFFIC/GLOBAL CAMS: ${cams.length} live feeds available (AI vision analysis on demand).`)
   if (layers.weatherOn) lines.push(`WEATHER: live precipitation radar overlay active.`)
 
   lines.push(`MARKETS: ${mkt}.`)
