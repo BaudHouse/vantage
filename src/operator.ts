@@ -199,6 +199,98 @@ export async function forecastMarket(
   }
 }
 
+const PROPOSE_SYSTEM = `You are VANTAGE's forecasting desk. From the LIVE global
+situation, invent NEW, specific, falsifiable YES/NO forecasting questions about
+what may happen in the next 1-6 months. Ground every question in the actual
+events shown — name real places/actors from the data, not generic scenarios.
+Each needs an unambiguous resolution. Do NOT repeat any of these existing
+questions: {EXISTING}.
+Reply with ONLY a JSON array (no prose) of 3-5 objects, each exactly:
+{"category":"MIL"|"GEO"|"ECON"|"CIVIL","question":"...","seedYes":<0-100 int>}.`
+
+export interface ProposedMarket {
+  category: 'MIL' | 'GEO' | 'ECON' | 'CIVIL'
+  question: string
+  seedYes: number
+}
+
+const CATS = new Set(['MIL', 'GEO', 'ECON', 'CIVIL'])
+
+/** Pull a clean ProposedMarket[] out of a (possibly messy) model response. */
+export function parseProposed(text: string): ProposedMarket[] {
+  let data: unknown = null
+  try {
+    data = JSON.parse(text)
+  } catch {
+    const m = text.match(/\[[\s\S]*\]/)
+    if (m) {
+      try {
+        data = JSON.parse(m[0])
+      } catch {
+        return []
+      }
+    }
+  }
+  // Ollama's JSON mode may wrap the array in an object; dig out the first array.
+  let arr: unknown = data
+  if (data && !Array.isArray(data) && typeof data === 'object') {
+    arr = Object.values(data as Record<string, unknown>).find(Array.isArray) ?? []
+  }
+  if (!Array.isArray(arr)) return []
+  const out: ProposedMarket[] = []
+  for (const it of arr) {
+    if (!it || typeof it !== 'object') continue
+    const o = it as Record<string, unknown>
+    const category = String(o.category ?? '').toUpperCase()
+    const question = String(o.question ?? '').trim()
+    if (!CATS.has(category) || question.length < 12) continue
+    let seedYes = Number(o.seedYes)
+    if (!Number.isFinite(seedYes)) seedYes = 25
+    seedYes = Math.max(1, Math.min(99, Math.round(seedYes)))
+    out.push({ category: category as ProposedMarket['category'], question, seedYes })
+    if (out.length >= 5) break
+  }
+  return out
+}
+
+/** Ask the local model to propose fresh prediction questions from live state. */
+export async function proposeMarkets(
+  model: string,
+  context: string,
+  existing: string[],
+): Promise<ProposedMarket[]> {
+  try {
+    const sys = PROPOSE_SYSTEM.replace('{EXISTING}', existing.slice(0, 10).join(' | '))
+    const messages: ChatMsg[] = [
+      { role: 'system', content: sys },
+      {
+        role: 'user',
+        content: `LIVE SITUATION:\n${context}\n\nReturn the JSON array now:`,
+      },
+    ]
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // NOTE: deliberately NOT using Ollama's format:'json' here — for a top-
+      // level array it collapses the items into one flat object with duplicate
+      // keys. Plain generation yields a real JSON array, which parseProposed
+      // extracts (it also recovers an array embedded in any stray prose).
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: { temperature: 0.8 },
+      }),
+      ms: 120000,
+    })
+    if (!r || !r.ok) return []
+    const j = await r.json()
+    return parseProposed(j?.message?.content ?? '')
+  } catch {
+    return []
+  }
+}
+
 /**
  * Send a turn to the analyst. `context` is a compact situation summary built
  * from the live feeds so the model can reason over current state.

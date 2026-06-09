@@ -4,10 +4,14 @@ import {
   castVote,
   getVotes,
   view,
+  loadGenerated,
+  saveGenerated,
+  buildGeneratedMarkets,
+  type Market,
   type PredCategory,
 } from '../predictions'
 import { sentiment, type Quote, type QuoteGroup } from '../markets'
-import { forecastMarket, ollamaModel } from '../operator'
+import { forecastMarket, ollamaModel, proposeMarkets } from '../operator'
 import Markdown from './Markdown'
 
 const CAT_COLOR: Record<PredCategory, string> = {
@@ -46,6 +50,39 @@ function Predictions({ getContext }: { getContext: () => string }) {
   const [votes, setVotes] = useState(getVotes())
   const [ai, setAi] = useState<Record<string, AiState>>({})
   const [allBusy, setAllBusy] = useState(false)
+  const [generated, setGenerated] = useState<Market[]>(() => loadGenerated())
+  const [genBusy, setGenBusy] = useState(false)
+  const [genErr, setGenErr] = useState<string | null>(null)
+
+  const markets = [...generated, ...MARKETS]
+
+  const generate = async () => {
+    setGenBusy(true)
+    setGenErr(null)
+    const model = await ollamaModel()
+    if (!model) {
+      setGenErr('Local model not ready (Ollama).')
+      setGenBusy(false)
+      return
+    }
+    const existing = markets.map((m) => m.question)
+    const proposals = await proposeMarkets(model, getContext(), existing)
+    if (!proposals.length) {
+      setGenErr('No new questions returned — try again.')
+      setGenBusy(false)
+      return
+    }
+    const fresh = buildGeneratedMarkets(proposals, Date.now())
+    const next = [...fresh, ...generated].slice(0, 12)
+    setGenerated(next)
+    saveGenerated(next)
+    setGenBusy(false)
+  }
+
+  const clearGenerated = () => {
+    setGenerated([])
+    saveGenerated([])
+  }
 
   const runForecast = async (id: string, question: string) => {
     setAi((s) => ({ ...s, [id]: { ...s[id], loading: true, error: undefined } }))
@@ -68,7 +105,7 @@ function Predictions({ getContext }: { getContext: () => string }) {
 
   const runAll = async () => {
     setAllBusy(true)
-    for (const m of MARKETS) {
+    for (const m of markets) {
       // eslint-disable-next-line no-await-in-loop
       await runForecast(m.id, m.question)
     }
@@ -77,10 +114,26 @@ function Predictions({ getContext }: { getContext: () => string }) {
 
   return (
     <div className="preds">
-      <button className="ai-all" onClick={runAll} disabled={allBusy}>
-        {allBusy ? '◍ forecasting…' : '🔮 AI FORECAST ALL'}
-      </button>
-      {MARKETS.map((m) => {
+      <div className="pred-actions">
+        <button className="ai-all" onClick={runAll} disabled={allBusy || genBusy}>
+          {allBusy ? '◍ forecasting…' : '🔮 FORECAST ALL'}
+        </button>
+        <button
+          className="ai-gen"
+          onClick={generate}
+          disabled={genBusy || allBusy}
+          title="Propose fresh prediction markets from the live feed"
+        >
+          {genBusy ? '◍ generating…' : '✨ NEW FROM FEED'}
+        </button>
+      </div>
+      {genErr && <div className="ai-err">⚠ {genErr}</div>}
+      {generated.length > 0 && (
+        <button className="gen-clear" onClick={clearGenerated}>
+          clear {generated.length} generated ✕
+        </button>
+      )}
+      {markets.map((m) => {
         const v = view(m, votes)
         const a = ai[m.id] ?? {}
         return (
@@ -88,6 +141,7 @@ function Predictions({ getContext }: { getContext: () => string }) {
             <div className="pred-head">
               <span className="cat" style={{ color: CAT_COLOR[m.category] }}>
                 ◈ {m.category}
+                {m.generated && <em className="gen-tag">NEW · AI</em>}
               </span>
               <span className="pred-meta">
                 {v.votes} votes · {v.daysLeft}d

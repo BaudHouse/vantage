@@ -12,6 +12,7 @@ export interface Market {
   seedYes: number
   seedVotes: number
   resolves: string // ISO date
+  generated?: boolean // true = proposed by the AI from the live feed
 }
 
 export const MARKETS: Market[] = [
@@ -32,6 +33,43 @@ export const MARKETS: Market[] = [
   { id: 'gold-5k', category: 'ECON', seedYes: 44, seedVotes: 613,
     question: 'Will gold close above $5,000/oz in 2026?', resolves: '2026-12-31' },
 ]
+
+// --- AI-generated markets (proposed from the live feed) --------------------
+const GEN_KEY = 'vantage.genmarkets.v1'
+
+export function loadGenerated(): Market[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(GEN_KEY) || '[]')
+    return Array.isArray(arr) ? (arr as Market[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveGenerated(markets: Market[]): void {
+  try {
+    localStorage.setItem(GEN_KEY, JSON.stringify(markets.slice(0, 12)))
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Build durable Market rows from AI proposals (id, resolution date, votes). */
+export function buildGeneratedMarkets(
+  proposals: { category: PredCategory; question: string; seedYes: number }[],
+  now: number,
+): Market[] {
+  const resolves = new Date(now + 120 * 86_400_000).toISOString().slice(0, 10)
+  return proposals.map((p, i) => ({
+    id: `gen-${now}-${i}`,
+    category: p.category,
+    question: p.question,
+    seedYes: p.seedYes,
+    seedVotes: 20 + ((now + i) % 80),
+    resolves,
+    generated: true,
+  }))
+}
 
 const KEY = 'vantage.votes.v1'
 
