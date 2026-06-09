@@ -15,13 +15,28 @@ import { fetchFires, firesEnabled } from './fires'
 import { connectShips, disconnectShips, getShips, shipsEnabled } from './ships'
 import { fetchRadarFrame, type RadarFrame } from './weather'
 import {
+  fetchHazards,
+  fetchVolcanoes,
+  fetchStorms,
+  fetchRadiation,
+  fetchWxAlerts,
+  fetchSatellites,
+  fetchEmscQuakes,
+} from './morefeeds'
+import {
   LAYERS,
   type Aircraft,
   type Camera,
   type Entity,
   type Fire,
+  type Hazard,
   type LayerId,
+  type Radiation,
+  type Satellite,
   type Ship,
+  type Storm,
+  type Volcano,
+  type WxAlert,
 } from './layers'
 import {
   buildBriefing,
@@ -59,6 +74,12 @@ export default function App() {
   const [ships, setShips] = useState<Ship[]>([])
   const [cameras, setCameras] = useState<Camera[]>([])
   const [fires, setFires] = useState<Fire[]>([])
+  const [hazards, setHazards] = useState<Hazard[]>([])
+  const [volcanoes, setVolcanoes] = useState<Volcano[]>([])
+  const [storms, setStorms] = useState<Storm[]>([])
+  const [radiation, setRadiation] = useState<Radiation[]>([])
+  const [wxAlerts, setWxAlerts] = useState<WxAlert[]>([])
+  const [satellites, setSatellites] = useState<Satellite[]>([])
   const [radar, setRadar] = useState<RadarFrame | null>(null)
   const [active, setActive] = useState<Set<LayerId>>(DEFAULT_ON)
   const [loading, setLoading] = useState(true)
@@ -81,11 +102,26 @@ export default function App() {
   const onFire = active.has('fire')
   const onShip = active.has('ship')
   const onWeather = active.has('weather')
+  const onHazard = active.has('hazard')
+  const onVolcano = active.has('volcano')
+  const onStorm = active.has('storm')
+  const onAlert = active.has('alert')
+  const onRadiation = active.has('radiation')
+  const onSatellite = active.has('satellite')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [ev, mk] = await Promise.all([fetchAll(), fetchMarkets()])
-    setEvents(ev)
+    const [ev, mk, emsc] = await Promise.all([
+      fetchAll(),
+      fetchMarkets(),
+      fetchEmscQuakes(),
+    ])
+    // Merge EMSC quakes with USGS, de-duping near-identical events.
+    const seen = new Set(ev.map((e) => `${e.lat.toFixed(1)},${e.lng.toFixed(1)}`))
+    const extra = emsc.filter(
+      (e) => !seen.has(`${e.lat.toFixed(1)},${e.lng.toFixed(1)}`),
+    )
+    setEvents([...ev, ...extra])
     setMarkets(mk)
     setUpdated(Date.now())
     setLoading(false)
@@ -175,6 +211,81 @@ export default function App() {
     }
   }, [onWeather])
 
+  // ---- expansion layers (free / key-less) ----
+  useEffect(() => {
+    if (!onHazard) return setHazards([]), undefined
+    let alive = true
+    const pull = () => fetchHazards().then((d) => alive && setHazards(d))
+    pull()
+    const t = setInterval(pull, 600_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onHazard])
+
+  useEffect(() => {
+    if (!onVolcano) return setVolcanoes([]), undefined
+    let alive = true
+    const pull = () => fetchVolcanoes().then((d) => alive && setVolcanoes(d))
+    pull()
+    const t = setInterval(pull, 600_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onVolcano])
+
+  useEffect(() => {
+    if (!onStorm) return setStorms([]), undefined
+    let alive = true
+    const pull = () => fetchStorms().then((d) => alive && setStorms(d))
+    pull()
+    const t = setInterval(pull, 600_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onStorm])
+
+  useEffect(() => {
+    if (!onAlert) return setWxAlerts([]), undefined
+    let alive = true
+    const pull = () => fetchWxAlerts().then((d) => alive && setWxAlerts(d))
+    pull()
+    const t = setInterval(pull, 300_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onAlert])
+
+  useEffect(() => {
+    if (!onRadiation) return setRadiation([]), undefined
+    let alive = true
+    const pull = () => fetchRadiation().then((d) => alive && setRadiation(d))
+    pull()
+    const t = setInterval(pull, 600_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onRadiation])
+
+  // ISS — poll every 8s (wheretheiss rate-limits ~1/s; keep margin).
+  useEffect(() => {
+    if (!onSatellite) return setSatellites([]), undefined
+    let alive = true
+    const pull = () =>
+      fetchSatellites().then((d) => alive && d.length && setSatellites(d))
+    pull()
+    const t = setInterval(pull, 8_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onSatellite])
+
   const intensity = useMemo(() => conflictByCountry(events), [events])
   const stats = useMemo(() => deriveStats(events), [events])
 
@@ -195,12 +306,23 @@ export default function App() {
   // Icon entities filtered by active layer.
   const markers = useMemo<Entity[]>(() => {
     const out: Entity[] = []
-    if (on('aircraft')) out.push(...aircraft)
-    if (on('ship')) out.push(...ships)
-    if (on('camera')) out.push(...cameras)
-    if (on('fire')) out.push(...fires)
+    if (onAircraft) out.push(...aircraft)
+    if (onShip) out.push(...ships)
+    if (onCamera) out.push(...cameras)
+    if (onFire) out.push(...fires)
+    if (onHazard) out.push(...hazards)
+    if (onVolcano) out.push(...volcanoes)
+    if (onStorm) out.push(...storms)
+    if (onAlert) out.push(...wxAlerts)
+    if (onRadiation) out.push(...radiation)
+    if (onSatellite) out.push(...satellites)
     return out
-  }, [on, aircraft, ships, cameras, fires])
+  }, [
+    onAircraft, onShip, onCamera, onFire, onHazard, onVolcano, onStorm,
+    onAlert, onRadiation, onSatellite,
+    aircraft, ships, cameras, fires, hazards, volcanoes, storms, wxAlerts,
+    radiation, satellites,
+  ])
 
   const counts = useMemo(() => {
     const c = {} as Record<LayerId, number>
@@ -212,8 +334,14 @@ export default function App() {
     c.camera = cameras.length
     c.fire = fires.length
     c.weather = radar ? 1 : 0
+    c.hazard = hazards.length
+    c.volcano = volcanoes.length
+    c.storm = storms.length
+    c.alert = wxAlerts.length
+    c.radiation = radiation.length
+    c.satellite = satellites.length
     return c
-  }, [events, aircraft, ships, cameras, fires, radar])
+  }, [events, aircraft, ships, cameras, fires, radar, hazards, volcanoes, storms, wxAlerts, radiation, satellites])
 
   const keyMissing = useMemo(() => {
     const s = new Set<LayerId>()

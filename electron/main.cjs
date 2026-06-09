@@ -12,6 +12,10 @@ const ALLOWED_HOSTS = new Set([
   'stooq.com', 'api.adsb.lol', 'cwwp2.dot.ca.gov', 'webcams.nyctmc.org',
   'api.rainviewer.com', 'tilecache.rainviewer.com',
   'firms.modaps.eosdis.nasa.gov', 'raw.githubusercontent.com',
+  // expansion feeds
+  'www.gdacs.org', 'volcanoes.usgs.gov', 'www.nhc.noaa.gov',
+  'www.seismicportal.eu', 'api.safecast.org', 'api.weather.gov',
+  'api.wheretheiss.at', 'api.coingecko.com',
   '127.0.0.1', 'localhost', // local Ollama
 ])
 

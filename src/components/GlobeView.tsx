@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Globe from 'react-globe.gl'
 import * as THREE from 'three'
 import { KIND_COLOR, WORLD_GEOJSON, type GeoEvent } from '../feeds'
-import { ENTITY_COLOR, entityTitle, type Entity } from '../layers'
+import { ENTITY_COLOR, ENTITY_GLYPH, entityTitle, type Entity } from '../layers'
 import type { Aircraft, Ship } from '../layers'
 import type { RadarFrame } from '../weather'
 import { escapeHtml } from '../safe'
@@ -85,6 +85,22 @@ function drawIcon(type: string, color: string): THREE.Texture {
     ctx.beginPath()
     ctx.arc(0, 1, 4, 0, Math.PI * 2)
     ctx.fill()
+  } else {
+    // Generic glyph marker (hazard / volcano / storm / radiation / alert /
+    // satellite) — a colored glow disc behind the layer's emoji.
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 24)
+    g.addColorStop(0, color)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.globalAlpha = 0.5
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(0, 0, 24, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.font = '30px "Segoe UI Emoji", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(ENTITY_GLYPH[type] ?? '◆', 0, 2)
   }
 
   const tex = new THREE.CanvasTexture(cv)

@@ -173,6 +173,7 @@ const GROUP_LABEL: Record<QuoteGroup, string> = {
   defense: 'DEFENSE STOCKS',
   commodity: 'COMMODITIES',
   forex: 'FOREX',
+  crypto: 'CRYPTO',
 }
 
 function Markets({ quotes }: { quotes: Quote[] }) {

@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
 import { ENTITY_COLOR, ENTITY_GLYPH, entityTitle, type Entity } from '../layers'
-import type { Aircraft, Ship, Camera, Fire } from '../layers'
+import type {
+  Aircraft,
+  Ship,
+  Camera,
+  Fire,
+  Hazard,
+  Volcano,
+  Storm,
+  Radiation,
+  WxAlert,
+  Satellite,
+} from '../layers'
 import type { GeoEvent } from '../feeds'
+
+const clip = (s: string, n = 16) => (s ? s.slice(0, n).replace('T', ' ') : '—')
 import { safeUrl } from '../safe'
 
 interface Props {
@@ -109,6 +122,59 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
     ]
     image = c.image
     video = c.video
+  } else if (e.kind === 'hazard') {
+    const h = e as Hazard
+    rows = [
+      { k: 'Type', v: h.hazardType },
+      { k: 'Alert level', v: h.severity },
+      { k: 'Country', v: h.country || '—' },
+      { k: 'Score', v: h.level ? h.level.toFixed(1) : '—' },
+      { k: 'From', v: clip(h.date, 10) },
+    ]
+    url = h.url
+  } else if (e.kind === 'volcano') {
+    const v = e as Volcano
+    rows = [
+      { k: 'Name', v: v.name },
+      { k: 'Alert level', v: v.level },
+      { k: 'Aviation code', v: v.color || '—' },
+      { k: 'Observatory', v: v.observatory },
+      { k: 'Region', v: v.region || '—' },
+    ]
+  } else if (e.kind === 'storm') {
+    const s = e as Storm
+    rows = [
+      { k: 'Name', v: s.name },
+      { k: 'Classification', v: s.classification || '—' },
+      { k: 'Max winds', v: s.intensityMph ? `${s.intensityMph} mph` : '—' },
+      { k: 'Pressure', v: s.pressureMb ? `${s.pressureMb} mb` : '—' },
+      { k: 'Movement', v: s.movement || '—' },
+      { k: 'Basin', v: s.basin || '—' },
+    ]
+  } else if (e.kind === 'radiation') {
+    const r = e as Radiation
+    rows = [
+      { k: 'Reading', v: `${r.value} ${r.unit}` },
+      { k: 'Location', v: r.location || '—' },
+      { k: 'Device', v: r.device || '—' },
+      { k: 'Captured', v: clip(r.captured) },
+    ]
+  } else if (e.kind === 'alert') {
+    const a = e as WxAlert
+    rows = [
+      { k: 'Event', v: a.event },
+      { k: 'Severity', v: a.severity || '—' },
+      { k: 'Area', v: a.area || '—' },
+      { k: 'Headline', v: a.headline || '—' },
+      { k: 'Expires', v: clip(a.expires) },
+    ]
+  } else if (e.kind === 'satellite') {
+    const s = e as Satellite
+    rows = [
+      { k: 'Satellite', v: s.name },
+      { k: 'Altitude', v: `${s.altitude.toLocaleString()} km` },
+      { k: 'Velocity', v: `${s.velocity.toLocaleString()} km/h` },
+    ]
   } else {
     const ev = e as GeoEvent
     rows = eventRows(ev)

@@ -5,8 +5,9 @@ import { rawFetch } from './net'
 
 const DEV = import.meta.env.DEV
 const STOOQ = DEV ? '/feeds/stooq' : 'https://stooq.com'
+const COINGECKO = DEV ? '/feeds/coingecko' : 'https://api.coingecko.com'
 
-export type QuoteGroup = 'defense' | 'commodity' | 'forex'
+export type QuoteGroup = 'defense' | 'commodity' | 'forex' | 'crypto'
 
 export interface Quote {
   group: QuoteGroup
@@ -72,9 +73,45 @@ async function one(spec: Spec): Promise<Quote | null> {
   }
 }
 
+const CRYPTO: { id: string; name: string }[] = [
+  { id: 'bitcoin', name: 'Bitcoin' },
+  { id: 'ethereum', name: 'Ethereum' },
+  { id: 'solana', name: 'Solana' },
+  { id: 'tether-gold', name: 'Tether Gold' },
+]
+
+async function fetchCrypto(): Promise<Quote[]> {
+  try {
+    const ids = CRYPTO.map((c) => c.id).join(',')
+    const r = await rawFetch(
+      `${COINGECKO}/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`,
+      { ms: 8000 },
+    )
+    if (!r || !r.ok) return []
+    const j = await r.json()
+    return CRYPTO.flatMap((c) => {
+      const d = j?.[c.id]
+      if (!d || typeof d.usd !== 'number') return []
+      return [{
+        group: 'crypto' as const,
+        symbol: c.id,
+        name: c.name,
+        price: d.usd,
+        changePct: Number(d.usd_24h_change ?? 0),
+        flag: '₿',
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
 export async function fetchMarkets(): Promise<Quote[]> {
-  const out = await Promise.all(SPECS.map(one))
-  return out.filter((q): q is Quote => q !== null)
+  const [stocks, crypto] = await Promise.all([
+    Promise.all(SPECS.map(one)),
+    fetchCrypto(),
+  ])
+  return [...stocks.filter((q): q is Quote => q !== null), ...crypto]
 }
 
 /** Overall market sentiment from defense-stock breadth. */
