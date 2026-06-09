@@ -330,19 +330,24 @@ export default function GlobeView({
           onGlobeClick?.(lat, lng)
         }
         // ---- conflict choropleth ----
+        // Kept deliberately FLAT and hugging the surface (max altitude 0.008,
+        // below every marker at 0.012+) so the fill tints countries by conflict
+        // intensity without extruding a red dome that buries cameras, fires and
+        // other markers underneath it. Intensity now reads through colour, not
+        // height, and the cap is translucent so markers show through.
         polygonsData={countries}
         polygonAltitude={(d: any) => {
           const v = intensity[nameOf(d)] ?? 0
-          return v ? 0.01 + (v / maxIntensity) * 0.06 : 0.006
+          return 0.002 + (v / maxIntensity) * 0.006
         }}
         polygonCapColor={(d: any) => {
           const v = intensity[nameOf(d)] ?? 0
-          if (!v) return 'rgba(40,52,70,0.10)'
-          const a = 0.18 + (v / maxIntensity) * 0.55
+          if (!v) return 'rgba(40,52,70,0.06)'
+          const a = 0.1 + (v / maxIntensity) * 0.35
           return `rgba(220,40,40,${a.toFixed(2)})`
         }}
-        polygonSideColor={() => 'rgba(180,30,30,0.08)'}
-        polygonStrokeColor={() => 'rgba(120,150,190,0.25)'}
+        polygonSideColor={() => 'rgba(180,30,30,0.05)'}
+        polygonStrokeColor={() => 'rgba(120,150,190,0.2)'}
         polygonLabel={(d: any) => {
           const name = escapeHtml(nameOf(d))
           const v = intensity[nameOf(d)] ?? 0
@@ -370,7 +375,7 @@ export default function GlobeView({
         objectAltitude={(d: any) =>
           (d as Entity).kind === 'aircraft'
             ? 0.02 + Math.min(0.1, ((d as Aircraft).altitude || 0) / 450000)
-            : 0.012
+            : 0.018
         }
         objectThreeObject={(d: any) => spriteFor(d as Entity)}
         objectLabel={(d: any) => `<div class="tip">${escapeHtml(entityTitle(d as Entity))}</div>`}
