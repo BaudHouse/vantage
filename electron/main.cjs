@@ -16,6 +16,7 @@ const ALLOWED_HOSTS = new Set([
   'www.gdacs.org', 'volcanoes.usgs.gov', 'www.nhc.noaa.gov',
   'www.seismicportal.eu', 'api.safecast.org', 'api.weather.gov',
   'api.wheretheiss.at', 'api.coingecko.com',
+  'api.waqi.info', 'api.windy.com', 'webcams.windy.com',
   '127.0.0.1', 'localhost', // local Ollama
 ])
 
@@ -28,7 +29,9 @@ function loadKeys() {
   } catch {
     /* ignore malformed key file */
   }
-  for (const k of ['VITE_FIRMS_KEY', 'VITE_AISSTREAM_KEY']) {
+  for (const k of [
+    'VITE_FIRMS_KEY', 'VITE_AISSTREAM_KEY', 'VITE_WAQI_KEY', 'VITE_WINDY_KEY',
+  ]) {
     if (process.env[k]) out[k] = process.env[k]
   }
   return out

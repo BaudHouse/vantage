@@ -22,10 +22,13 @@ import {
   fetchWxAlerts,
   fetchSatellites,
   fetchEmscQuakes,
+  fetchAirQuality,
+  airQualityEnabled,
 } from './morefeeds'
 import {
   LAYERS,
   type Aircraft,
+  type AirQuality,
   type Camera,
   type Entity,
   type Fire,
@@ -80,6 +83,7 @@ export default function App() {
   const [radiation, setRadiation] = useState<Radiation[]>([])
   const [wxAlerts, setWxAlerts] = useState<WxAlert[]>([])
   const [satellites, setSatellites] = useState<Satellite[]>([])
+  const [airQuality, setAirQuality] = useState<AirQuality[]>([])
   const [radar, setRadar] = useState<RadarFrame | null>(null)
   const [active, setActive] = useState<Set<LayerId>>(DEFAULT_ON)
   const [loading, setLoading] = useState(true)
@@ -108,6 +112,7 @@ export default function App() {
   const onAlert = active.has('alert')
   const onRadiation = active.has('radiation')
   const onSatellite = active.has('satellite')
+  const onAirQuality = active.has('airquality')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -286,6 +291,18 @@ export default function App() {
     }
   }, [onSatellite])
 
+  useEffect(() => {
+    if (!onAirQuality || !airQualityEnabled()) return setAirQuality([]), undefined
+    let alive = true
+    const pull = () => fetchAirQuality().then((d) => alive && setAirQuality(d))
+    pull()
+    const t = setInterval(pull, 600_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [onAirQuality])
+
   const intensity = useMemo(() => conflictByCountry(events), [events])
   const stats = useMemo(() => deriveStats(events), [events])
 
@@ -316,12 +333,13 @@ export default function App() {
     if (onAlert) out.push(...wxAlerts)
     if (onRadiation) out.push(...radiation)
     if (onSatellite) out.push(...satellites)
+    if (onAirQuality) out.push(...airQuality)
     return out
   }, [
     onAircraft, onShip, onCamera, onFire, onHazard, onVolcano, onStorm,
-    onAlert, onRadiation, onSatellite,
+    onAlert, onRadiation, onSatellite, onAirQuality,
     aircraft, ships, cameras, fires, hazards, volcanoes, storms, wxAlerts,
-    radiation, satellites,
+    radiation, satellites, airQuality,
   ])
 
   const counts = useMemo(() => {
@@ -340,13 +358,14 @@ export default function App() {
     c.alert = wxAlerts.length
     c.radiation = radiation.length
     c.satellite = satellites.length
+    c.airquality = airQuality.length
     return c
-  }, [events, aircraft, ships, cameras, fires, radar, hazards, volcanoes, storms, wxAlerts, radiation, satellites])
+  }, [events, aircraft, ships, cameras, fires, radar, hazards, volcanoes, storms, wxAlerts, radiation, satellites, airQuality])
 
   const keyMissing = useMemo(() => {
     const s = new Set<LayerId>()
-    if (!firesEnabled()) s.add('fire')
     if (!shipsEnabled()) s.add('ship')
+    if (!airQualityEnabled()) s.add('airquality')
     return s
   }, [])
 

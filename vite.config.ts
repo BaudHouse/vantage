@@ -92,6 +92,8 @@ export default defineConfig({
       '/feeds/nws': { target: 'https://api.weather.gov', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/nws/, '') },
       '/feeds/iss': { target: 'https://api.wheretheiss.at', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/iss/, '') },
       '/feeds/coingecko': { target: 'https://api.coingecko.com', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/coingecko/, '') },
+      '/feeds/waqi': { target: 'https://api.waqi.info', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/waqi/, '') },
+      '/feeds/windy': { target: 'https://api.windy.com', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/windy/, '') },
       '/ollama': {
         target: 'http://127.0.0.1:11434',
         changeOrigin: true,

@@ -73,10 +73,13 @@ in `userData/keys.json` — they load at runtime and stay off the bundle.
   back to publisher country (clearly labeled in the feed).
 - The 1.8 MB globe chunk (three.js) loads after first paint — fine for desktop.
 
-## Data sources (14 live layers)
+## Data sources (15 live layers)
 GDELT (conflict) · USGS + EMSC (seismic) · GDACS (multi-hazard alerts) ·
 NASA EONET (disasters) · adsb.lol (aircraft) · NOAA NHC (cyclones) ·
 USGS HANS (volcanoes) · NASA EONET/FIRMS (wildfires) · NWS (US severe-wx alerts) ·
-wheretheiss (ISS) · Safecast (radiation) · AISStream (vessels) ·
-NYC DOT + Caltrans (traffic cams) · RainViewer (weather radar) ·
+wheretheiss (ISS) · Safecast (radiation) · WAQI (air quality†) · AISStream (vessels†) ·
+NYC DOT + Caltrans + Windy (traffic + global cams†) · RainViewer (weather radar) ·
 Stooq + CoinGecko (markets/crypto) · Natural Earth · Ollama (local AI)
+
+† optional, free signup key (FIRMS, AISStream, WAQI, Windy) — load via `.env.local`
+in dev or `userData/keys.json` in a build. Everything else is fully key-less.

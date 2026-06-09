@@ -53,12 +53,21 @@ export async function rawFetch(
   }
 }
 
+export type KeyName =
+  | 'VITE_FIRMS_KEY'
+  | 'VITE_AISSTREAM_KEY'
+  | 'VITE_WAQI_KEY'
+  | 'VITE_WINDY_KEY'
+
 /** Read an API key at runtime — from the Electron main process if present,
  *  else from Vite env (static access so Vite can inline it in dev). */
-export function getKey(name: 'VITE_FIRMS_KEY' | 'VITE_AISSTREAM_KEY'): string | undefined {
+export function getKey(name: KeyName): string | undefined {
   const fromBridge = bridge?.keys?.[name]
   if (fromBridge) return fromBridge
+  // Static accesses so Vite can inline each in the dev/browser build.
   if (name === 'VITE_FIRMS_KEY') return import.meta.env.VITE_FIRMS_KEY
   if (name === 'VITE_AISSTREAM_KEY') return import.meta.env.VITE_AISSTREAM_KEY
+  if (name === 'VITE_WAQI_KEY') return import.meta.env.VITE_WAQI_KEY
+  if (name === 'VITE_WINDY_KEY') return import.meta.env.VITE_WINDY_KEY
   return undefined
 }

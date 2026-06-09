@@ -11,6 +11,7 @@ import type {
   Radiation,
   WxAlert,
   Satellite,
+  AirQuality,
 } from '../layers'
 import type { GeoEvent } from '../feeds'
 
@@ -174,6 +175,17 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
       { k: 'Satellite', v: s.name },
       { k: 'Altitude', v: `${s.altitude.toLocaleString()} km` },
       { k: 'Velocity', v: `${s.velocity.toLocaleString()} km/h` },
+    ]
+  } else if (e.kind === 'airquality') {
+    const a = e as AirQuality
+    const band =
+      a.aqi <= 50 ? 'Good' : a.aqi <= 100 ? 'Moderate' : a.aqi <= 150
+        ? 'Unhealthy (sensitive)' : a.aqi <= 200 ? 'Unhealthy' : a.aqi <= 300
+          ? 'Very unhealthy' : 'Hazardous'
+    rows = [
+      { k: 'AQI (US)', v: `${a.aqi} — ${band}` },
+      { k: 'Station', v: a.location || '—' },
+      { k: 'Updated', v: clip(a.updated) },
     ]
   } else {
     const ev = e as GeoEvent

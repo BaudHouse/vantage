@@ -2,7 +2,7 @@
 // to the entity model in layers.ts. All routed through rawFetch so they work in
 // dev (Vite proxy) and in the packaged Electron build (main-process fetch).
 
-import { rawFetch } from './net'
+import { getKey, rawFetch } from './net'
 import type {
   Hazard,
   Volcano,
@@ -10,6 +10,7 @@ import type {
   Radiation,
   WxAlert,
   Satellite,
+  AirQuality,
 } from './layers'
 import type { GeoEvent } from './feeds'
 
@@ -22,6 +23,7 @@ const B = {
   safecast: DEV ? '/feeds/safecast' : 'https://api.safecast.org',
   nws: DEV ? '/feeds/nws' : 'https://api.weather.gov',
   iss: DEV ? '/feeds/iss' : 'https://api.wheretheiss.at',
+  waqi: DEV ? '/feeds/waqi' : 'https://api.waqi.info',
 }
 
 async function getJson(url: string, ms = 11000): Promise<any | null> {
@@ -212,6 +214,38 @@ export async function fetchSatellites(): Promise<Satellite[]> {
       velocity: Math.round(j.velocity ?? 0),
     },
   ]
+}
+
+// ---- WAQI: global air-quality index stations (free token) ------------------
+export function airQualityEnabled(): boolean {
+  return !!getKey('VITE_WAQI_KEY')
+}
+
+export async function fetchAirQuality(): Promise<AirQuality[]> {
+  const token = getKey('VITE_WAQI_KEY')
+  if (!token) return []
+  const j = await getJson(
+    `${B.waqi}/map/bounds/?latlng=-85,-180,85,180&token=${token}`,
+  )
+  if (j?.status !== 'ok' || !Array.isArray(j.data)) return []
+  const out: AirQuality[] = []
+  for (const s of j.data) {
+    const lat = Number(s.lat)
+    const lng = Number(s.lon)
+    const aqi = Number(s.aqi)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(aqi)) continue
+    out.push({
+      kind: 'airquality',
+      id: `waqi-${s.uid}`,
+      lat,
+      lng,
+      location: s.station?.name ?? '',
+      aqi,
+      updated: s.station?.time ?? '',
+    })
+  }
+  // Densest networks dominate; cap for legibility.
+  return out.slice(0, 600)
 }
 
 // ---- EMSC: additional real-time earthquakes (augments USGS) ----------------

@@ -143,6 +143,16 @@ export interface Satellite {
   velocity: number // km/h
 }
 
+export interface AirQuality {
+  kind: 'airquality'
+  id: string
+  lat: number
+  lng: number
+  location: string
+  aqi: number // US EPA Air Quality Index
+  updated: string
+}
+
 export type Entity =
   | GeoEvent
   | Aircraft
@@ -155,6 +165,7 @@ export type Entity =
   | Radiation
   | WxAlert
   | Satellite
+  | AirQuality
 
 export type LayerId =
   | 'conflict'
@@ -171,6 +182,13 @@ export type LayerId =
   | 'alert'
   | 'radiation'
   | 'satellite'
+  | 'airquality'
+
+export type KeyEnv =
+  | 'VITE_FIRMS_KEY'
+  | 'VITE_AISSTREAM_KEY'
+  | 'VITE_WAQI_KEY'
+  | 'VITE_WINDY_KEY'
 
 export interface LayerMeta {
   id: LayerId
@@ -180,7 +198,7 @@ export interface LayerMeta {
   /** layers off by default to keep the first paint light */
   defaultOn: boolean
   /** needs a free API key in .env */
-  needsKey?: 'VITE_FIRMS_KEY' | 'VITE_AISSTREAM_KEY'
+  needsKey?: KeyEnv
 }
 
 export const LAYERS: LayerMeta[] = [
@@ -195,22 +213,23 @@ export const LAYERS: LayerMeta[] = [
   { id: 'alert', label: 'Wx Alerts (US)', glyph: '🚨', color: '#ffd24d', defaultOn: false },
   { id: 'satellite', label: 'Satellites', glyph: '🛰', color: '#9fe0ff', defaultOn: false },
   { id: 'radiation', label: 'Radiation', glyph: '☢', color: '#cddc39', defaultOn: false },
+  { id: 'airquality', label: 'Air Quality', glyph: '🫁', color: '#7e57c2', defaultOn: false, needsKey: 'VITE_WAQI_KEY' },
   { id: 'ship', label: 'Vessels', glyph: '⚓', color: '#3ddc97', defaultOn: false, needsKey: 'VITE_AISSTREAM_KEY' },
-  { id: 'camera', label: 'Traffic Cams', glyph: '📷', color: '#c08bff', defaultOn: false },
+  { id: 'camera', label: 'Traffic + Global Cams', glyph: '📷', color: '#c08bff', defaultOn: false },
   { id: 'weather', label: 'Weather Radar', glyph: '🌧', color: '#5fd0e0', defaultOn: false },
 ]
 
 export const ENTITY_GLYPH: Record<string, string> = {
   conflict: '⚔', quake: '◎', disaster: '✷', aircraft: '✈', ship: '⚓',
   camera: '📷', fire: '🔥', hazard: '⚠', volcano: '🌋', storm: '🌀',
-  radiation: '☢', alert: '🚨', satellite: '🛰',
+  radiation: '☢', alert: '🚨', satellite: '🛰', airquality: '🫁',
 }
 
 export const ENTITY_COLOR: Record<string, string> = {
   conflict: '#ff4d4d', quake: '#ffb000', disaster: '#4db8ff', aircraft: '#e8eefc',
   ship: '#3ddc97', camera: '#c08bff', fire: '#ff7a1a', hazard: '#ff9500',
   volcano: '#ff5722', storm: '#4dd0e1', radiation: '#cddc39', alert: '#ffd24d',
-  satellite: '#9fe0ff',
+  satellite: '#9fe0ff', airquality: '#7e57c2',
 }
 
 /** A short human label for any entity (ticker, tooltip, dossier title). */
@@ -236,6 +255,8 @@ export function entityTitle(e: Entity): string {
       return e.event
     case 'satellite':
       return e.name
+    case 'airquality':
+      return `AQI ${e.aqi} · ${e.location || 'station'}`
     case 'conflict':
     case 'quake':
     case 'disaster':

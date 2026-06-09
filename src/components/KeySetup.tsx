@@ -33,6 +33,24 @@ const KEYS: KeyInfo[] = [
       'Wildfires already work key-less but cover the US only (NASA EONET). A free NASA FIRMS key adds dense GLOBAL VIIRS thermal detections.',
     present: !!getKey('VITE_FIRMS_KEY'),
   },
+  {
+    layer: 'Air quality (global)',
+    glyph: '🫁',
+    env: 'VITE_WAQI_KEY',
+    url: 'https://aqicn.org/data-platform/token/',
+    blurb:
+      'Worldwide air-quality index stations (PM2.5 / AQI). Free instant token from the World Air Quality Index project.',
+    present: !!getKey('VITE_WAQI_KEY'),
+  },
+  {
+    layer: 'Global webcams',
+    glyph: '📷',
+    env: 'VITE_WINDY_KEY',
+    url: 'https://api.windy.com/keys',
+    blurb:
+      'Adds tens of thousands of WORLDWIDE webcams to the camera gallery (searchable by country/region) on top of the key-less US traffic cams.',
+    present: !!getKey('VITE_WINDY_KEY'),
+  },
 ]
 
 export default function KeySetup({ open, onClose }: Props) {

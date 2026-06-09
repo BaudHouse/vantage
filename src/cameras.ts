@@ -5,11 +5,12 @@
 //     kept for geographic spread.
 
 import type { Camera } from './layers'
-import { rawFetch } from './net'
+import { getKey, rawFetch } from './net'
 
 const DEV = import.meta.env.DEV
 const CT = DEV ? '/feeds/caltrans' : 'https://cwwp2.dot.ca.gov'
 const NYC = DEV ? '/feeds/nyccams' : 'https://webcams.nyctmc.org'
+const WINDY = DEV ? '/feeds/windy' : 'https://api.windy.com'
 const TFL = DEV ? '/feeds/tfl' : 'https://api.tfl.gov.uk'
 // Images/video load directly (no CORS needed for <img>/<video>).
 const NYC_IMG = 'https://webcams.nyctmc.org'
@@ -139,12 +140,56 @@ async function fetchTfl(limit = 400): Promise<Camera[]> {
   return out
 }
 
+/** Windy global webcams (free key) — worldwide coverage, searchable by region. */
+export function windyEnabled(): boolean {
+  return !!getKey('VITE_WINDY_KEY')
+}
+
+async function fetchWindy(limit = 300): Promise<Camera[]> {
+  const key = getKey('VITE_WINDY_KEY')
+  if (!key) return []
+  try {
+    const r = await rawFetch(
+      `${WINDY}/webcams/api/v3/webcams?limit=${limit}&include=location,images`,
+      { ms: 10000, headers: { 'x-windy-api-key': key } },
+    )
+    if (!r || !r.ok) return []
+    const j = await r.json()
+    const list: any[] = j?.webcams ?? []
+    const out: Camera[] = []
+    for (const w of list) {
+      const lat = Number(w?.location?.latitude)
+      const lng = Number(w?.location?.longitude)
+      const img = w?.images?.current?.preview || w?.images?.daylight?.preview
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !img) continue
+      const country = w?.location?.country ?? ''
+      const city = w?.location?.city ?? ''
+      out.push({
+        kind: 'camera',
+        id: `windy-${w.webcamId}`,
+        lat,
+        lng,
+        name: w.title ?? city ?? 'Webcam',
+        road: city,
+        region: [country, city].filter(Boolean).join(' · ') || 'Global',
+        image: img,
+        source: 'Windy',
+        live: false,
+      })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
 export async function fetchCameras(): Promise<Camera[]> {
-  const [nyc, ca, tfl] = await Promise.all([
+  const [nyc, ca, tfl, windy] = await Promise.all([
     fetchNyc(),
     fetchCaltrans(),
     fetchTfl(),
+    fetchWindy(),
   ])
-  // Live NYC cams first, then London (video), then California.
-  return [...nyc, ...tfl, ...ca]
+  // Live NYC cams first, then London (video), global Windy, then California.
+  return [...nyc, ...tfl, ...windy, ...ca]
 }
