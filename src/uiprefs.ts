@@ -33,3 +33,25 @@ export function saveUi(patch: Partial<UiPrefs>): void {
     /* private mode / quota — prefs are best-effort */
   }
 }
+
+// Which layers the operator had switched on, remembered across reloads.
+const LAYERS_KEY = 'vantage.layers.v1'
+
+export function loadActiveLayers(): string[] | null {
+  try {
+    const raw = localStorage.getItem(LAYERS_KEY)
+    if (!raw) return null
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? (arr as string[]) : null
+  } catch {
+    return null
+  }
+}
+
+export function saveActiveLayers(ids: string[]): void {
+  try {
+    localStorage.setItem(LAYERS_KEY, JSON.stringify(ids))
+  } catch {
+    /* best-effort */
+  }
+}

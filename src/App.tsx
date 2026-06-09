@@ -65,7 +65,13 @@ import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
 import { nearestCameras, scanCameras } from './vision'
 import { recordSnapshot } from './trends'
-import { loadUi, saveUi, type Density } from './uiprefs'
+import {
+  loadUi,
+  saveUi,
+  loadActiveLayers,
+  saveActiveLayers,
+  type Density,
+} from './uiprefs'
 import './App.css'
 import './layers.css'
 
@@ -74,6 +80,18 @@ const REFRESH_MS = 120_000
 const DEFAULT_ON = new Set<LayerId>(
   LAYERS.filter((l) => l.defaultOn).map((l) => l.id),
 )
+const VALID_LAYER_IDS = new Set<LayerId>(LAYERS.map((l) => l.id))
+
+// Restore the operator's layer selection, falling back to defaults on a fresh
+// browser. Unknown ids (from an older build) are filtered out.
+function initialActiveLayers(): Set<LayerId> {
+  const stored = loadActiveLayers()
+  if (!stored) return DEFAULT_ON
+  const valid = stored.filter((id): id is LayerId =>
+    VALID_LAYER_IDS.has(id as LayerId),
+  )
+  return valid.length ? new Set(valid) : DEFAULT_ON
+}
 
 export default function App() {
   const [events, setEvents] = useState<GeoEvent[]>([])
@@ -90,7 +108,7 @@ export default function App() {
   const [satellites, setSatellites] = useState<Satellite[]>([])
   const [airQuality, setAirQuality] = useState<AirQuality[]>([])
   const [radar, setRadar] = useState<RadarFrame | null>(null)
-  const [active, setActive] = useState<Set<LayerId>>(DEFAULT_ON)
+  const [active, setActive] = useState<Set<LayerId>>(initialActiveLayers)
   const [loading, setLoading] = useState(true)
   const [updated, setUpdated] = useState(0)
   const [selected, setSelected] = useState<Entity | null>(null)
@@ -98,6 +116,7 @@ export default function App() {
   const [gallery, setGallery] = useState(false)
   const [keySetup, setKeySetup] = useState(false)
   const [trendsOpen, setTrendsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [leftOpen, setLeftOpen] = useState(() => loadUi().left)
   const [rightOpen, setRightOpen] = useState(() => loadUi().right)
   const [density, setDensity] = useState<Density>(() => loadUi().density)
@@ -117,6 +136,11 @@ export default function App() {
   useEffect(() => {
     saveUi({ left: leftOpen, right: rightOpen, density })
   }, [leftOpen, rightOpen, density])
+
+  // Remember which layers are switched on across reloads.
+  useEffect(() => {
+    saveActiveLayers([...active])
+  }, [active])
 
   // Focus mode = both rails hidden so the globe goes full-bleed.
   const focusMode = !leftOpen && !rightOpen
@@ -144,7 +168,8 @@ export default function App() {
         const goFocus = leftOpen || rightOpen
         setLeftOpen(!goFocus)
         setRightOpen(!goFocus)
-      }
+      } else if (e.key === '?') setHelpOpen((v) => !v)
+      else if (e.key === 'Escape') setHelpOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -555,6 +580,13 @@ export default function App() {
           >
             ⇲
           </button>
+          <button
+            className="navbtn icon"
+            onClick={() => setHelpOpen(true)}
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
           <span className="nav-sep" />
           <button className="navbtn" onClick={openCameras}>
             📷 CAMS
@@ -708,6 +740,45 @@ export default function App() {
       />
       <KeySetup open={keySetup} onClose={() => setKeySetup(false)} />
       <TrendsModal open={trendsOpen} onClose={() => setTrendsOpen(false)} />
+      {helpOpen && (
+        <div className="modal" onClick={() => setHelpOpen(false)}>
+          <div className="help-card" onClick={(e) => e.stopPropagation()}>
+            <div className="help-head">
+              <div>
+                <span className="help-kicker">QUICK REFERENCE</span>
+                <h2>Keyboard &amp; gestures</h2>
+              </div>
+              <button className="x" onClick={() => setHelpOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="help-grid">
+              {[
+                ['[', 'Toggle the live-feed rail'],
+                [']', 'Toggle the markets rail'],
+                ['F  /  \\', 'Full-globe focus mode'],
+                ['?', 'Show / hide this panel'],
+                ['Esc', 'Close this panel'],
+              ].map(([k, d]) => (
+                <div className="help-row" key={k}>
+                  <kbd>{k}</kbd>
+                  <span>{d}</span>
+                </div>
+              ))}
+            </div>
+            <div className="help-gestures">
+              <div className="help-row">
+                <span className="help-gesture">Click globe</span>
+                <span>AI sitrep from the nearest live cameras</span>
+              </div>
+              <div className="help-row">
+                <span className="help-gesture">Click marker</span>
+                <span>Open its dossier (planes, quakes, cams…)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

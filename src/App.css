@@ -493,6 +493,58 @@ html, body, #root {
   .grid { grid-template-columns: 280px 1fr 280px; }
 }
 
+/* ---------- shortcuts help ---------- */
+.help-card {
+  width: min(440px, 92vw);
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+.help-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.help-kicker { color: var(--cyan); font-size: 10px; letter-spacing: 2px; }
+.help-head h2 { margin: 4px 0 0; color: var(--white); font-size: 17px; }
+.help-head .x {
+  background: none;
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+.help-grid { display: flex; flex-direction: column; gap: 2px; }
+.help-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 12px; color: var(--txt); }
+.help-row kbd {
+  min-width: 56px;
+  text-align: center;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--white);
+}
+.help-gesture {
+  min-width: 88px;
+  color: var(--cyan);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.help-gestures {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---------- compact density ---------- */
 .density-compact { font-size: 12px; }
 .density-compact .topbar { padding: 7px 14px; gap: 18px; }
