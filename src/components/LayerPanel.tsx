@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { LAYERS, type LayerId } from '../layers'
+import { loadUi, saveUi } from '../uiprefs'
 
 interface Props {
   active: Set<LayerId>
@@ -25,7 +26,12 @@ export default function LayerPanel({
   onToggle,
   onKeySetup,
 }: Props) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => loadUi().layers)
+  const toggleOpen = () =>
+    setOpen((v) => {
+      saveUi({ layers: !v })
+      return !v
+    })
   const byId = (id: LayerId) => LAYERS.find((l) => l.id === id)
 
   return (
@@ -33,7 +39,7 @@ export default function LayerPanel({
       <div className="lp-head">
         <button
           className="lp-collapse"
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggleOpen}
           title={open ? 'Collapse layers' : 'Expand layers'}
         >
           <span className={`lp-chev ${open ? 'open' : ''}`}>▸</span>

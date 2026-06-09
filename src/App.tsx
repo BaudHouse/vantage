@@ -65,6 +65,7 @@ import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
 import { nearestCameras, scanCameras } from './vision'
 import { recordSnapshot } from './trends'
+import { loadUi, saveUi, type Density } from './uiprefs'
 import './App.css'
 import './layers.css'
 
@@ -97,8 +98,9 @@ export default function App() {
   const [gallery, setGallery] = useState(false)
   const [keySetup, setKeySetup] = useState(false)
   const [trendsOpen, setTrendsOpen] = useState(false)
-  const [leftOpen, setLeftOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(true)
+  const [leftOpen, setLeftOpen] = useState(() => loadUi().left)
+  const [rightOpen, setRightOpen] = useState(() => loadUi().right)
+  const [density, setDensity] = useState<Density>(() => loadUi().density)
   const [areaScan, setAreaScan] = useState<{
     lat: number
     lng: number
@@ -110,6 +112,43 @@ export default function App() {
   const [focus, setFocus] = useState<{ entity: Entity; n: number } | null>(null)
   const [viewers] = useState(() => 90 + Math.floor(Math.random() * 60))
   const askN = useRef(0)
+
+  // Persist workspace layout so a reload restores the operator's setup.
+  useEffect(() => {
+    saveUi({ left: leftOpen, right: rightOpen, density })
+  }, [leftOpen, rightOpen, density])
+
+  // Focus mode = both rails hidden so the globe goes full-bleed.
+  const focusMode = !leftOpen && !rightOpen
+  const onToggleFocus = () => {
+    const goFocus = leftOpen || rightOpen
+    setLeftOpen(!goFocus)
+    setRightOpen(!goFocus)
+  }
+
+  // Keyboard shortcuts: [ left rail · ] right rail · \ or f full-globe.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (
+        el &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.isContentEditable)
+      )
+        return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === '[') setLeftOpen((v) => !v)
+      else if (e.key === ']') setRightOpen((v) => !v)
+      else if (e.key === '\\' || e.key === 'f') {
+        const goFocus = leftOpen || rightOpen
+        setLeftOpen(!goFocus)
+        setRightOpen(!goFocus)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [leftOpen, rightOpen])
 
   // Stable per-layer booleans so a polling effect only re-runs when ITS layer
   // toggles — not on every unrelated layer change (which would tear down and
@@ -471,7 +510,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app density-${density}`}>
       <header className="topbar">
         <div className="brand">
           <span className="logo">▲</span>
@@ -495,6 +534,27 @@ export default function App() {
         <nav className="topnav">
           <span className="live">● LIVE</span>
           <span className="viewers">👁 {viewers}</span>
+          <span className="nav-sep" />
+          <button
+            className={`navbtn icon ${focusMode ? 'on' : ''}`}
+            onClick={onToggleFocus}
+            title="Full-globe focus mode (f) — hide both side rails"
+          >
+            ⛶
+          </button>
+          <button
+            className={`navbtn icon ${density === 'compact' ? 'on' : ''}`}
+            onClick={() =>
+              setDensity((d) => (d === 'cozy' ? 'compact' : 'cozy'))
+            }
+            title={
+              density === 'cozy'
+                ? 'Switch to compact density'
+                : 'Switch to cozy density'
+            }
+          >
+            ⇲
+          </button>
           <span className="nav-sep" />
           <button className="navbtn" onClick={openCameras}>
             📷 CAMS
