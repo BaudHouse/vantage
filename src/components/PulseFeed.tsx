@@ -95,7 +95,7 @@ export default function PulseFeed({
           const conf = confidence(e)
           const v = votes[e.id] ?? 0
           return (
-            <div className="card-ev" key={e.id}>
+            <div className={`card-ev card-${e.kind}`} key={e.id}>
               <div className="ce-top">
                 <span className={`sev sev-${e.kind}`}>
                   {e.kind === 'conflict'

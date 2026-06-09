@@ -97,6 +97,8 @@ export default function App() {
   const [gallery, setGallery] = useState(false)
   const [keySetup, setKeySetup] = useState(false)
   const [trendsOpen, setTrendsOpen] = useState(false)
+  const [leftOpen, setLeftOpen] = useState(true)
+  const [rightOpen, setRightOpen] = useState(true)
   const [areaScan, setAreaScan] = useState<{
     lat: number
     lng: number
@@ -512,13 +514,33 @@ export default function App() {
 
       <Ticker events={events} />
 
-      <main className="grid">
-        <PulseFeed
-          events={events}
-          updated={updated}
-          onOpenBriefing={openBriefing}
-          onSelect={setSelected}
-        />
+      <main
+        className="grid"
+        style={{
+          gridTemplateColumns: `${leftOpen ? '320px' : '0'} 1fr ${
+            rightOpen ? '320px' : '0'
+          }`,
+        }}
+      >
+        {leftOpen ? (
+          <div className="rail-host left">
+            <button
+              className="rail-collapse left"
+              onClick={() => setLeftOpen(false)}
+              title="Collapse feed"
+            >
+              ‹
+            </button>
+            <PulseFeed
+              events={events}
+              updated={updated}
+              onOpenBriefing={openBriefing}
+              onSelect={setSelected}
+            />
+          </div>
+        ) : (
+          <div />
+        )}
 
         <section className="center">
           <ErrorBoundary label="Globe">
@@ -542,6 +564,24 @@ export default function App() {
             onToggle={toggle}
             onKeySetup={() => setKeySetup(true)}
           />
+          {!leftOpen && (
+            <button
+              className="rail-reopen left"
+              onClick={() => setLeftOpen(true)}
+              title="Show live feed"
+            >
+              ›
+            </button>
+          )}
+          {!rightOpen && (
+            <button
+              className="rail-reopen right"
+              onClick={() => setRightOpen(true)}
+              title="Show markets"
+            >
+              ‹
+            </button>
+          )}
           {selected && (
             <Dossier
               entity={selected}
@@ -579,7 +619,20 @@ export default function App() {
           </div>
         </section>
 
-        <RightRail quotes={markets} getContext={getContext} />
+        {rightOpen ? (
+          <div className="rail-host right">
+            <button
+              className="rail-collapse right"
+              onClick={() => setRightOpen(false)}
+              title="Collapse markets"
+            >
+              ›
+            </button>
+            <RightRail quotes={markets} getContext={getContext} />
+          </div>
+        ) : (
+          <div />
+        )}
       </main>
 
       <OperatorChat

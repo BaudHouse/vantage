@@ -92,7 +92,7 @@ html, body, #root {
   cursor: pointer;
   letter-spacing: 0.5px;
 }
-.navbtn:hover { border-color: var(--red); color: var(--white); }
+.navbtn:hover { border-color: var(--cyan); color: var(--white); }
 .navbtn.on { border-color: var(--cyan); color: var(--cyan); }
 .navbtn:disabled { opacity: 0.5; cursor: default; }
 .clearance {
@@ -156,6 +156,64 @@ html, body, #root {
   min-height: 0;
 }
 
+/* ---------- collapsible rails ---------- */
+.rail-host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.rail-host > .pulse,
+.rail-host > .rail {
+  flex: 1;
+  min-height: 0;
+}
+.rail-collapse {
+  position: absolute;
+  top: 10px;
+  z-index: 8;
+  width: 20px;
+  height: 26px;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+}
+.rail-collapse:hover { opacity: 1; color: var(--white); border-color: var(--cyan); }
+.rail-collapse.left { right: 8px; }
+.rail-collapse.right { left: 8px; }
+.rail-reopen {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 7;
+  width: 18px;
+  height: 44px;
+  background: rgba(8, 12, 20, 0.82);
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rail-reopen:hover { color: var(--white); border-color: var(--cyan); }
+.rail-reopen.left { left: 0; border-left: 0; border-radius: 0 9px 9px 0; }
+.rail-reopen.right { right: 0; border-right: 0; border-radius: 9px 0 0 9px; }
+
 /* ---------- pulse feed (left) ---------- */
 .pulse {
   border-right: 1px solid var(--line);
@@ -207,10 +265,13 @@ html, body, #root {
 .card-ev {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-left: 2px solid var(--red);
+  border-left: 2px solid var(--dim2);
   border-radius: 7px;
   padding: 9px 11px;
 }
+.card-conflict { border-left-color: var(--red); }
+.card-quake { border-left-color: var(--amber); }
+.card-disaster { border-left-color: var(--cyan); }
 .card-ev:hover { background: var(--panel2); }
 .ce-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .sev { font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 2px 6px; border-radius: 4px; }
