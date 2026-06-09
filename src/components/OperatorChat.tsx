@@ -116,6 +116,13 @@ export default function OperatorChat({
             <span className={`op-status ${model ? 'on' : 'off'}`}>
               {!checked ? 'connecting…' : model ? model : 'model loading'}
             </span>
+            <button
+              className="op-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close operator chat"
+            >
+              ✕
+            </button>
           </div>
           <div className="op-body">
             {msgs.map((m, i) => (

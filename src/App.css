@@ -500,7 +500,21 @@ html, body, #root {
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
-.op-head { display: flex; justify-content: space-between; align-items: center; padding: 11px 13px; border-bottom: 1px solid var(--line); }
+.op-head { display: flex; gap: 9px; align-items: center; padding: 11px 13px; border-bottom: 1px solid var(--line); }
+.op-close {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  flex: none;
+}
+.op-close:hover { color: var(--white); border-color: var(--red); }
 .op-head b { color: var(--white); font-size: 12px; letter-spacing: 1px; }
 .op-status { font-size: 9px; padding: 3px 8px; border-radius: 10px; }
 .op-status.on { background: rgba(61, 220, 151, 0.15); color: var(--green); }
