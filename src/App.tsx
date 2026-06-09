@@ -70,6 +70,8 @@ import {
   saveUi,
   loadActiveLayers,
   saveActiveLayers,
+  hintSeen,
+  markHintSeen,
   type Density,
 } from './uiprefs'
 import './App.css'
@@ -117,6 +119,7 @@ export default function App() {
   const [keySetup, setKeySetup] = useState(false)
   const [trendsOpen, setTrendsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [showHint, setShowHint] = useState(() => !hintSeen())
   const [leftOpen, setLeftOpen] = useState(() => loadUi().left)
   const [rightOpen, setRightOpen] = useState(() => loadUi().right)
   const [density, setDensity] = useState<Density>(() => loadUi().density)
@@ -141,6 +144,18 @@ export default function App() {
   useEffect(() => {
     saveActiveLayers([...active])
   }, [active])
+
+  const dismissHint = useCallback(() => {
+    setShowHint(false)
+    markHintSeen()
+  }, [])
+
+  // Auto-retire the onboarding hint after a while if it's ignored.
+  useEffect(() => {
+    if (!showHint) return
+    const t = setTimeout(dismissHint, 14000)
+    return () => clearTimeout(t)
+  }, [showHint, dismissHint])
 
   // Focus mode = both rails hidden so the globe goes full-bleed.
   const focusMode = !leftOpen && !rightOpen
@@ -504,6 +519,7 @@ export default function App() {
 
   // Click an empty spot on the globe -> AI sitrep from the nearest cameras.
   const onGlobeClick = async (lat: number, lng: number) => {
+    if (showHint) dismissHint()
     const near = nearestCameras(cameras, lat, lng, 4)
     if (!near.length) {
       setAreaScan({
@@ -681,6 +697,22 @@ export default function App() {
             >
               ‹
             </button>
+          )}
+          {showHint && (
+            <div className="globe-hint" role="status">
+              <span className="gh-dot" />
+              <span>
+                Click anywhere on the globe for an instant <b>AI sitrep</b> from
+                the nearest live cameras · press <kbd>?</kbd> for shortcuts
+              </span>
+              <button
+                className="gh-x"
+                onClick={dismissHint}
+                aria-label="Dismiss hint"
+              >
+                ✕
+              </button>
+            </div>
           )}
           {selected && (
             <Dossier

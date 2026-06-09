@@ -55,3 +55,22 @@ export function saveActiveLayers(ids: string[]): void {
     /* best-effort */
   }
 }
+
+// One-time onboarding hint that surfaces the globe-click AI sitrep.
+const HINT_KEY = 'vantage.hint.v1'
+
+export function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === '1'
+  } catch {
+    return true // if storage is unavailable, don't nag
+  }
+}
+
+export function markHintSeen(): void {
+  try {
+    localStorage.setItem(HINT_KEY, '1')
+  } catch {
+    /* best-effort */
+  }
+}
