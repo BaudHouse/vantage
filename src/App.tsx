@@ -61,6 +61,10 @@ import CameraGallery from './components/CameraGallery'
 import Launcher from './components/Launcher'
 import KeySetup from './components/KeySetup'
 import ErrorBoundary from './components/ErrorBoundary'
+import Markdown from './components/Markdown'
+import TrendsModal from './components/TrendsModal'
+import { nearestCameras, scanCameras } from './vision'
+import { recordSnapshot } from './trends'
 import './App.css'
 import './layers.css'
 
@@ -92,6 +96,15 @@ export default function App() {
   const [briefing, setBriefing] = useState<Briefing | null>(null)
   const [gallery, setGallery] = useState(false)
   const [keySetup, setKeySetup] = useState(false)
+  const [trendsOpen, setTrendsOpen] = useState(false)
+  const [areaScan, setAreaScan] = useState<{
+    lat: number
+    lng: number
+    busy?: boolean
+    status?: string
+    result?: string
+    err?: string
+  } | null>(null)
   const [focus, setFocus] = useState<{ entity: Entity; n: number } | null>(null)
   const [viewers] = useState(() => 90 + Math.floor(Math.random() * 60))
   const askN = useRef(0)
@@ -304,6 +317,24 @@ export default function App() {
   const intensity = useMemo(() => conflictByCountry(events), [events])
   const stats = useMemo(() => deriveStats(events), [events])
 
+  // Snapshot the global picture each refresh for the historical trends view.
+  useEffect(() => {
+    if (!updated) return
+    recordSnapshot({
+      active: stats.active,
+      tensions: stats.tensions,
+      quakes: events.filter((e) => e.kind === 'quake').length,
+      hazards: hazards.length,
+      storms: storms.length,
+      fires: fires.length,
+      aircraft: aircraft.length,
+      ships: ships.length,
+      alerts: wxAlerts.length,
+      airquality: airQuality.length,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updated])
+
   // Events filtered by active layer (conflict / quake / disaster).
   const shownEvents = useMemo(
     () => events.filter((e) => active.has(e.kind as LayerId)),
@@ -405,6 +436,27 @@ export default function App() {
     setFocus({ entity: e, n: askN.current })
   }
 
+  // Click an empty spot on the globe -> AI sitrep from the nearest cameras.
+  const onGlobeClick = async (lat: number, lng: number) => {
+    const near = nearestCameras(cameras, lat, lng, 4)
+    if (!near.length) {
+      setAreaScan({
+        lat,
+        lng,
+        err: cameras.length
+          ? 'No cameras within ~400 km of here.'
+          : 'Toggle “Traffic + Global Cams” on, then click an area to scan it.',
+      })
+      return
+    }
+    const label = near[0].region || `${lat.toFixed(1)}, ${lng.toFixed(1)}`
+    setAreaScan({ lat, lng, busy: true, status: 'locating cameras…' })
+    const outcome = await scanCameras(near, label, (status) =>
+      setAreaScan({ lat, lng, busy: true, status }),
+    )
+    setAreaScan({ lat, lng, ...outcome })
+  }
+
   // Opening the camera gallery auto-enables the Traffic Cams layer so feeds load.
   const openCameras = () => {
     setActive((prev) => {
@@ -444,6 +496,9 @@ export default function App() {
           <button className="navbtn" onClick={openCameras}>
             📷 CAMS
           </button>
+          <button className="navbtn" onClick={() => setTrendsOpen(true)}>
+            📈 TRENDS
+          </button>
           <button className="navbtn" onClick={openBriefing}>
             ◫ BRIEFING
           </button>
@@ -475,6 +530,7 @@ export default function App() {
                 intensity={intensity}
                 radar={radar}
                 onSelect={setSelected}
+                onGlobeClick={onGlobeClick}
               />
             </Suspense>
           </ErrorBoundary>
@@ -491,6 +547,25 @@ export default function App() {
               onClose={() => setSelected(null)}
               onAsk={askAbout}
             />
+          )}
+          {areaScan && (
+            <div className="area-scan">
+              <div className="area-scan-head">
+                <b>
+                  ◉ AREA SITREP · {areaScan.lat.toFixed(2)}, {areaScan.lng.toFixed(2)}
+                </b>
+                <button onClick={() => setAreaScan(null)}>✕</button>
+              </div>
+              {areaScan.busy && (
+                <div className="area-scan-busy">◍ {areaScan.status}</div>
+              )}
+              {areaScan.err && <div className="area-scan-err">⚠ {areaScan.err}</div>}
+              {areaScan.result && (
+                <div className="area-scan-body">
+                  <Markdown text={areaScan.result} />
+                </div>
+              )}
+            </div>
           )}
           <div className="botbar">
             <span className="bb-item">
@@ -523,6 +598,7 @@ export default function App() {
         onClose={() => setGallery(false)}
       />
       <KeySetup open={keySetup} onClose={() => setKeySetup(false)} />
+      <TrendsModal open={trendsOpen} onClose={() => setTrendsOpen(false)} />
     </div>
   )
 }

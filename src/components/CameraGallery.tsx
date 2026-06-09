@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Camera } from '../layers'
 import { fetchImageBase64 } from '../net'
-import { analyzeArea, analyzeImage, visionModel } from '../operator'
+import { analyzeImage, visionModel } from '../operator'
+import { scanCameras } from '../vision'
 import Markdown from './Markdown'
 
 interface Props {
@@ -38,31 +39,11 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
   } | null>(null)
 
   const scanArea = async (cams: Camera[]) => {
-    const pick = cams.slice(0, 4)
-    if (!pick.length) return
-    setArea({ busy: true, status: 'finding vision model…' })
-    const model = await visionModel()
-    if (!model) {
-      setArea({ err: 'No vision model. Run `ollama pull qwen2.5vl:7b`.' })
-      return
-    }
-    setArea({ busy: true, status: `capturing ${pick.length} frames…` })
-    const grabbed = await Promise.all(
-      pick.map(async (c) => ({ cam: c, b64: await fetchImageBase64(c.image) })),
+    if (!cams.length) return
+    const outcome = await scanCameras(cams, q || 'this view', (status) =>
+      setArea({ busy: true, status }),
     )
-    const ok = grabbed.filter((g) => g.b64) as { cam: Camera; b64: string }[]
-    if (!ok.length) {
-      setArea({ err: 'Could not capture any frames.' })
-      return
-    }
-    setArea({ busy: true, status: `analyzing ${ok.length} cameras…` })
-    const list = ok.map((g, i) => `${i + 1}. ${g.cam.name} (${g.cam.region})`).join('\n')
-    const out = await analyzeArea(
-      model,
-      ok.map((g) => g.b64),
-      `Live cameras in this view (in image order):\n${list}\n\nProduce a combined situational report.`,
-    )
-    setArea({ result: out ?? '⚠ Vision model unreachable.' })
+    setArea(outcome)
   }
 
   const analyzeCam = async (cam: Camera) => {

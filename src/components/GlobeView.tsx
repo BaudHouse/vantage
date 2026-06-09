@@ -14,6 +14,7 @@ interface Props {
   intensity: Record<string, number>
   radar: RadarFrame | null
   onSelect: (e: Entity) => void
+  onGlobeClick?: (lat: number, lng: number) => void
 }
 
 // ---- icon textures (drawn once per type+color, cached) ---------------------
@@ -238,6 +239,7 @@ export default function GlobeView({
   intensity,
   radar,
   onSelect,
+  onGlobeClick,
 }: Props) {
   const globeRef = useRef<any>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -324,6 +326,9 @@ export default function GlobeView({
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         atmosphereColor="#c0392b"
         atmosphereAltitude={0.16}
+        onGlobeClick={({ lat, lng }: { lat: number; lng: number }) =>
+          onGlobeClick?.(lat, lng)
+        }
         // ---- conflict choropleth ----
         polygonsData={countries}
         polygonAltitude={(d: any) => {
