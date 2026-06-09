@@ -614,8 +614,8 @@ export default function App() {
       <main
         className="grid"
         style={{
-          gridTemplateColumns: `${leftOpen ? '320px' : '0'} 1fr ${
-            rightOpen ? '320px' : '0'
+          gridTemplateColumns: `${leftOpen ? 'var(--rail)' : '0'} 1fr ${
+            rightOpen ? 'var(--rail)' : '0'
           }`,
         }}
       >

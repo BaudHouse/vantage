@@ -13,6 +13,7 @@
   --green: #3ddc97;
   --cyan: #5fd0e0;
   --white: #f3f7fb;
+  --rail: 320px; /* side-rail width; shrinks on narrow viewports */
 }
 
 * { box-sizing: border-box; }
@@ -496,8 +497,25 @@ html, body, #root {
 ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* ---------- responsive: shed decorative chrome before it crowds ---------- */
+@media (max-width: 1280px) {
+  .brand-sub { display: none; }
+  .topbar { gap: 18px; }
+}
+@media (max-width: 1150px) {
+  .viewers { display: none; }
+  .live { font-size: 0; } /* keep the pulsing dot, drop the "LIVE" word */
+  .live::before { content: '●'; font-size: 11px; }
+  .top-stats { gap: 16px; }
+  .topnav { gap: 9px; }
+}
 @media (max-width: 1100px) {
-  .grid { grid-template-columns: 280px 1fr 280px; }
+  :root { --rail: 280px; }
+}
+@media (max-width: 1040px) {
+  :root { --rail: 260px; }
+  .tstat:nth-child(3) { display: none; } /* drop AIR TRACKS stat */
+  .navbtn { padding: 5px 9px; }
 }
 
 /* ---------- shortcuts help ---------- */
