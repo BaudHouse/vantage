@@ -36,11 +36,17 @@ export default defineConfig({
   base: './',
   plugins: [react(), imgProxy()],
   build: {
-    chunkSizeWarningLimit: 1200,
+    // The 'globe' chunk is three.js + react-globe.gl — an irreducible ~1.8 MB
+    // (≈518 kB gzip) 3D engine. It's deliberately split into its own chunk and
+    // lazy-loaded (see the lazy GlobeView import in App.tsx), so it never blocks
+    // first paint — the app shell is ~92 kB gzip and renders immediately. The
+    // size warning is therefore a false positive for this architecture; the
+    // limit is set just above the vendor bundle rather than silently disabled.
+    chunkSizeWarningLimit: 1900,
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes('node_modules/three')) return 'three'
+          if (id.includes('node_modules/three')) return 'globe'
           if (id.includes('node_modules/react-globe.gl')) return 'globe'
           if (id.includes('node_modules/three-globe')) return 'globe'
         },
