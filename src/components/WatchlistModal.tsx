@@ -72,7 +72,7 @@ export default function WatchlistModal({
           onClick={onToggleNotify}
           aria-pressed={notifyOn}
         >
-          <span>🔔 Desktop alerts on spikes</span>
+          <span>🔔 Desktop alerts · spikes &amp; developing situations</span>
           <span className="watch-toggle">{notifyOn ? 'ON' : 'OFF'}</span>
         </button>
 

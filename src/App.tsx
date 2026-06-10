@@ -485,6 +485,36 @@ export default function App() {
     }
   }, [watchAlerts, notifyOn])
 
+  // Same opt-in also pushes a notification when a NEW developing situation
+  // (anomaly) is detected — early warning that reaches you, not just the panel.
+  const notifiedAnomRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const live = new Set(anomalies.map((a) => a.key))
+    for (const k of [...notifiedAnomRef.current]) {
+      if (!live.has(k)) notifiedAnomRef.current.delete(k)
+    }
+    if (
+      !notifyOn ||
+      typeof Notification === 'undefined' ||
+      Notification.permission !== 'granted'
+    )
+      return
+    for (const a of anomalies) {
+      if (notifiedAnomRef.current.has(a.key)) continue
+      notifiedAnomRef.current.add(a.key)
+      try {
+        new Notification('VANTAGE · developing situation', {
+          body: `${a.label}: ${a.current} (${
+            a.z >= 99 ? 'spike' : `${a.z}σ`
+          }, ▲${a.pct}% vs baseline)`,
+          tag: `vantage-anom-${a.key}`,
+        })
+      } catch {
+        /* best-effort */
+      }
+    }
+  }, [anomalies, notifyOn])
+
   // User-initiated: request OS permission, then enable spike notifications.
   const toggleNotify = async () => {
     if (notifyOn) {
