@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   MARKETS,
   castVote,
@@ -83,6 +83,24 @@ function Predictions({ getContext }: { getContext: () => string }) {
     setGenerated([])
     saveGenerated([])
   }
+
+  // First visit with no generated markets: once the live feed has had a moment
+  // to populate, quietly propose a fresh batch so the board isn't just the 8
+  // seeds. Runs at most once per session and silently no-ops without a model.
+  const autoTried = useRef(false)
+  useEffect(() => {
+    if (autoTried.current || generated.length > 0) return
+    // Set the guard INSIDE the callback, not synchronously — otherwise React
+    // StrictMode's mount/unmount/mount cycle clears this timeout and the second
+    // run early-returns, so it would never fire in dev.
+    const t = setTimeout(() => {
+      if (autoTried.current || generated.length > 0 || genBusy) return
+      autoTried.current = true
+      void generate()
+    }, 6000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const runForecast = async (id: string, question: string) => {
     setAi((s) => ({ ...s, [id]: { ...s[id], loading: true, error: undefined } }))
