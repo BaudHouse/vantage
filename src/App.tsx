@@ -903,7 +903,11 @@ export default function App() {
         onClose={() => setGallery(false)}
       />
       <KeySetup open={keySetup} onClose={() => setKeySetup(false)} />
-      <TrendsModal open={trendsOpen} onClose={() => setTrendsOpen(false)} />
+      <TrendsModal
+        open={trendsOpen}
+        onClose={() => setTrendsOpen(false)}
+        getContext={getContext}
+      />
       <WatchlistModal
         open={watchOpen}
         onClose={() => setWatchOpen(false)}

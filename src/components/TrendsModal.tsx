@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { getTrends, TREND_METRICS as METRICS } from '../trends'
 import { detectAnomalies } from '../anomaly'
+import { assessSituations, ollamaModel } from '../operator'
+import Markdown from './Markdown'
 
 interface Props {
   open: boolean
   onClose: () => void
+  getContext: () => string
 }
 
 function Spark({
@@ -37,8 +40,13 @@ function Spark({
   )
 }
 
-export default function TrendsModal({ open, onClose }: Props) {
+export default function TrendsModal({ open, onClose, getContext }: Props) {
   const [scrub, setScrub] = useState<number | null>(null)
+  const [assess, setAssess] = useState<{
+    busy?: boolean
+    text?: string
+    err?: string
+  } | null>(null)
   if (!open) return null
   const snaps = getTrends()
   const last = snaps.length - 1
@@ -55,6 +63,23 @@ export default function TrendsModal({ open, onClose }: Props) {
       })
     : ''
   const anomalies = detectAnomalies(snaps, METRICS)
+
+  const runAssess = async () => {
+    setAssess({ busy: true })
+    const model = await ollamaModel()
+    if (!model) {
+      setAssess({ err: 'Local model not ready (Ollama).' })
+      return
+    }
+    const spikes = anomalies.map(
+      (a) =>
+        `${a.label}: ${a.current} vs baseline ${a.mean} (${
+          a.z >= 99 ? 'spike' : `${a.z}σ`
+        }, +${a.pct}%)`,
+    )
+    const text = await assessSituations(model, spikes, getContext())
+    setAssess(text ? { text } : { err: 'Operator unreachable.' })
+  }
 
   return (
     <div className="modal" onClick={onClose}>
@@ -90,6 +115,21 @@ export default function TrendsModal({ open, onClose }: Props) {
                 </span>
               </div>
             ))}
+            <button
+              className="ew-assess"
+              onClick={runAssess}
+              disabled={assess?.busy}
+            >
+              {assess?.busy
+                ? '◍ assessing…'
+                : '🔮 Assess developing situations with Operator'}
+            </button>
+            {assess?.err && <div className="ew-err">⚠ {assess.err}</div>}
+            {assess?.text && (
+              <div className="ew-assessment">
+                <Markdown text={assess.text} />
+              </div>
+            )}
           </div>
         )}
 

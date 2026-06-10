@@ -160,6 +160,49 @@ export interface Forecast {
   rationale: string
 }
 
+const ASSESS_SYSTEM = `You are VANTAGE's early-warning analyst. You are handed a
+list of metrics that just spiked abnormally above their baseline, plus the live
+global situation. For each spike, state in one tight sentence the most likely
+driver and the probable near-term development to watch for. Lead with the most
+consequential. Be concrete and grounded in the data; if a spike looks like
+benign noise or a data artefact, say so. End with a one-line BOTTOM LINE. Use
+short markdown bullets. Keep the whole thing under ~120 words.`
+
+/** Ask the model to interpret a set of detected anomalies / developing spikes. */
+export async function assessSituations(
+  model: string,
+  spikes: string[],
+  context: string,
+): Promise<string | null> {
+  try {
+    const messages: ChatMsg[] = [
+      { role: 'system', content: ASSESS_SYSTEM },
+      {
+        role: 'user',
+        content: `DEVELOPING SPIKES (metric: current vs baseline):\n${spikes
+          .map((s) => `- ${s}`)
+          .join('\n')}\n\nLIVE SITUATION:\n${context}\n\nAssess:`,
+      },
+    ]
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: { temperature: 0.4 },
+      }),
+      ms: 120000,
+    })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    return (j?.message?.content as string) ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Ask the local model to forecast a single prediction-market question. */
 export async function forecastMarket(
   model: string,
