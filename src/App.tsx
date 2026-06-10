@@ -65,6 +65,14 @@ import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
 import { nearestCameras, scanCameras } from './vision'
 import { recordSnapshot } from './trends'
+import WatchlistModal from './components/WatchlistModal'
+import {
+  loadWatch,
+  saveWatch,
+  loadBaseline,
+  saveBaseline,
+  computeAlerts,
+} from './watchlist'
 import {
   loadUi,
   saveUi,
@@ -120,6 +128,11 @@ export default function App() {
   const [trendsOpen, setTrendsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [showHint, setShowHint] = useState(() => !hintSeen())
+  const [watchOpen, setWatchOpen] = useState(false)
+  const [watch, setWatch] = useState<string[]>(() => loadWatch())
+  const [baseline, setBaseline] = useState<Record<string, number>>(() =>
+    loadBaseline(),
+  )
   const [leftOpen, setLeftOpen] = useState(() => loadUi().left)
   const [rightOpen, setRightOpen] = useState(() => loadUi().right)
   const [density, setDensity] = useState<Density>(() => loadUi().density)
@@ -398,6 +411,42 @@ export default function App() {
   const intensity = useMemo(() => conflictByCountry(events), [events])
   const stats = useMemo(() => deriveStats(events), [events])
 
+  const watchAlerts = useMemo(
+    () => computeAlerts(watch, intensity, baseline),
+    [watch, intensity, baseline],
+  )
+  // Pin a region; seed its baseline at the current level so only *future*
+  // escalation alerts (you opted in knowing the current state).
+  const addWatch = (name: string) => {
+    setWatch((prev) => {
+      if (prev.includes(name)) return prev
+      const next = [...prev, name]
+      saveWatch(next)
+      return next
+    })
+    setBaseline((prev) => {
+      const next = { ...prev, [name]: intensity[name] ?? 0 }
+      saveBaseline(next)
+      return next
+    })
+  }
+  const removeWatch = (name: string) => {
+    setWatch((prev) => {
+      const next = prev.filter((n) => n !== name)
+      saveWatch(next)
+      return next
+    })
+  }
+  // Acknowledge: re-baseline every watched region to its current level.
+  const ackWatch = () => {
+    setBaseline(() => {
+      const next: Record<string, number> = {}
+      for (const n of watch) next[n] = intensity[n] ?? 0
+      saveBaseline(next)
+      return next
+    })
+  }
+
   // Snapshot the global picture each refresh for the historical trends view.
   useEffect(() => {
     if (!updated) return
@@ -615,6 +664,15 @@ export default function App() {
           <button className="navbtn" onClick={() => setTrendsOpen(true)}>
             📈 TRENDS
           </button>
+          <button
+            className={`navbtn ${watchAlerts.length ? 'alerting' : ''}`}
+            onClick={() => setWatchOpen(true)}
+          >
+            ⭐ WATCH
+            {watchAlerts.length > 0 && (
+              <span className="nav-badge">{watchAlerts.length}</span>
+            )}
+          </button>
           <button className="navbtn" onClick={openBriefing}>
             ◫ BRIEFING
           </button>
@@ -781,6 +839,16 @@ export default function App() {
       />
       <KeySetup open={keySetup} onClose={() => setKeySetup(false)} />
       <TrendsModal open={trendsOpen} onClose={() => setTrendsOpen(false)} />
+      <WatchlistModal
+        open={watchOpen}
+        onClose={() => setWatchOpen(false)}
+        watch={watch}
+        intensity={intensity}
+        baseline={baseline}
+        onAdd={addWatch}
+        onRemove={removeWatch}
+        onAck={ackWatch}
+      />
       {helpOpen && (
         <div className="modal" onClick={() => setHelpOpen(false)}>
           <div
