@@ -567,6 +567,33 @@ html, body, #root {
 .brief-headline { color: var(--white); font-size: 14px; line-height: 1.5; margin: 16px 0; padding-left: 12px; border-left: 2px solid var(--red); }
 .brief-bullets { margin: 0 0 16px; padding-left: 18px; }
 .brief-bullets li { color: var(--txt); font-size: 12px; margin-bottom: 7px; line-height: 1.5; }
+.brief-outlook {
+  background: rgba(95, 208, 224, 0.06);
+  border: 1px solid rgba(95, 208, 224, 0.3);
+  border-radius: 9px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.bo-head { display: flex; justify-content: space-between; align-items: center; }
+.bo-head .brief-kicker { color: var(--cyan); }
+.bo-rerun {
+  background: none;
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 10px;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.bo-rerun:hover { color: var(--white); border-color: var(--cyan); }
+.bo-busy { color: var(--cyan); font-size: 12px; margin-top: 8px; }
+.bo-err { color: var(--amber); font-size: 11px; margin-top: 8px; }
+.bo-body { margin-top: 8px; color: var(--txt); font-size: 12px; line-height: 1.5; }
+.bo-body p { margin: 0 0 6px; }
+.bo-body ul { margin: 0 0 6px; padding-left: 18px; }
+.bo-body li { margin-bottom: 4px; }
+
 .brief-hot { background: var(--bg2); border: 1px solid var(--line); border-radius: 9px; padding: 12px; }
 .hot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
 .hot-count { color: var(--red); font-weight: 700; }

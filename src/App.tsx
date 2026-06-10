@@ -926,7 +926,11 @@ export default function App() {
         focus={focus}
         entityContext={entityContext}
       />
-      <BriefingModal briefing={briefing} onClose={() => setBriefing(null)} />
+      <BriefingModal
+        briefing={briefing}
+        onClose={() => setBriefing(null)}
+        getContext={getContext}
+      />
       <CameraGallery
         cameras={cameras}
         open={gallery}

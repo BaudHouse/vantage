@@ -168,6 +168,45 @@ consequential. Be concrete and grounded in the data; if a spike looks like
 benign noise or a data artefact, say so. End with a one-line BOTTOM LINE. Use
 short markdown bullets. Keep the whole thing under ~120 words.`
 
+const OUTLOOK_SYSTEM = `You are VANTAGE's forecasting desk. From the live global
+situation, give a concise forward look: the 3-5 most probable developments over
+the next 24-72 hours. Each is one markdown bullet that STARTS with a likelihood
+tag — **Likely** / **Possible** / **Watch** — and names real actors/places from
+the data. End with a one-line "BOTTOM LINE:". Keep it under ~110 words. Be
+calibrated and sober; anchor on base rates and avoid sensationalism.`
+
+/** Strategic forward forecast: probable developments over the next 24-72h. */
+export async function forecastOutlook(
+  model: string,
+  context: string,
+): Promise<string | null> {
+  try {
+    const messages: ChatMsg[] = [
+      { role: 'system', content: OUTLOOK_SYSTEM },
+      {
+        role: 'user',
+        content: `LIVE SITUATION:\n${context}\n\nForward look (next 24-72h):`,
+      },
+    ]
+    const r = await rawFetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: { temperature: 0.5 },
+      }),
+      ms: 120000,
+    })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    return (j?.message?.content as string) ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Ask the model to interpret a set of detected anomalies / developing spikes. */
 export async function assessSituations(
   model: string,
