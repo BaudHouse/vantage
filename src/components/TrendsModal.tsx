@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getTrends, TREND_METRICS as METRICS } from '../trends'
-import { detectAnomalies } from '../anomaly'
+import { detectAnomalies, type Anomaly } from '../anomaly'
 import { assessSituations, ollamaModel } from '../operator'
 import Markdown from './Markdown'
 
@@ -47,6 +47,39 @@ export default function TrendsModal({ open, onClose, getContext }: Props) {
     text?: string
     err?: string
   } | null>(null)
+  const assessedSigRef = useRef<string>('')
+
+  const runAssess = async (anoms: Anomaly[]) => {
+    if (!anoms.length) return
+    setAssess({ busy: true })
+    const model = await ollamaModel()
+    if (!model) {
+      setAssess({ err: 'Local model not ready (Ollama).' })
+      return
+    }
+    const spikes = anoms.map(
+      (a) =>
+        `${a.label}: ${a.current} vs baseline ${a.mean} (${
+          a.z >= 99 ? 'spike' : `${a.z}σ`
+        }, +${a.pct}%)`,
+    )
+    const text = await assessSituations(model, spikes, getContext())
+    setAssess(text ? { text } : { err: 'Operator unreachable.' })
+  }
+
+  // Auto-assess on open when situations are developing, but only once per
+  // distinct anomaly set — so opening the panel repeatedly doesn't re-spam the
+  // model, while a genuinely new spike triggers a fresh read.
+  useEffect(() => {
+    if (!open) return
+    const anom = detectAnomalies(getTrends(), METRICS)
+    if (!anom.length) return
+    const sig = anom.map((a) => a.key).sort().join(',')
+    if (assessedSigRef.current === sig) return
+    assessedSigRef.current = sig
+    void runAssess(anom)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
   if (!open) return null
   const snaps = getTrends()
   const last = snaps.length - 1
@@ -63,23 +96,6 @@ export default function TrendsModal({ open, onClose, getContext }: Props) {
       })
     : ''
   const anomalies = detectAnomalies(snaps, METRICS)
-
-  const runAssess = async () => {
-    setAssess({ busy: true })
-    const model = await ollamaModel()
-    if (!model) {
-      setAssess({ err: 'Local model not ready (Ollama).' })
-      return
-    }
-    const spikes = anomalies.map(
-      (a) =>
-        `${a.label}: ${a.current} vs baseline ${a.mean} (${
-          a.z >= 99 ? 'spike' : `${a.z}σ`
-        }, +${a.pct}%)`,
-    )
-    const text = await assessSituations(model, spikes, getContext())
-    setAssess(text ? { text } : { err: 'Operator unreachable.' })
-  }
 
   return (
     <div className="modal" onClick={onClose}>
@@ -117,12 +133,14 @@ export default function TrendsModal({ open, onClose, getContext }: Props) {
             ))}
             <button
               className="ew-assess"
-              onClick={runAssess}
+              onClick={() => runAssess(anomalies)}
               disabled={assess?.busy}
             >
               {assess?.busy
                 ? '◍ assessing…'
-                : '🔮 Assess developing situations with Operator'}
+                : assess?.text
+                  ? '↻ re-assess developing situations'
+                  : '🔮 Assess developing situations with Operator'}
             </button>
             {assess?.err && <div className="ew-err">⚠ {assess.err}</div>}
             {assess?.text && (
