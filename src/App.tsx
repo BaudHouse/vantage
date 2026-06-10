@@ -72,6 +72,8 @@ import {
   loadBaseline,
   saveBaseline,
   computeAlerts,
+  loadNotify,
+  saveNotify,
 } from './watchlist'
 import {
   loadUi,
@@ -133,6 +135,7 @@ export default function App() {
   const [baseline, setBaseline] = useState<Record<string, number>>(() =>
     loadBaseline(),
   )
+  const [notifyOn, setNotifyOn] = useState(() => loadNotify())
   const [leftOpen, setLeftOpen] = useState(() => loadUi().left)
   const [rightOpen, setRightOpen] = useState(() => loadUi().right)
   const [density, setDensity] = useState<Density>(() => loadUi().density)
@@ -445,6 +448,50 @@ export default function App() {
       saveBaseline(next)
       return next
     })
+  }
+
+  // Fire a desktop notification the first time each region crosses into an
+  // alerting state (cleared again once it drops out / is acknowledged).
+  const notifiedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const live = new Set(watchAlerts.map((a) => a.name))
+    for (const n of [...notifiedRef.current]) {
+      if (!live.has(n)) notifiedRef.current.delete(n)
+    }
+    if (
+      !notifyOn ||
+      typeof Notification === 'undefined' ||
+      Notification.permission !== 'granted'
+    )
+      return
+    for (const a of watchAlerts) {
+      if (notifiedRef.current.has(a.name)) continue
+      notifiedRef.current.add(a.name)
+      try {
+        new Notification('VANTAGE · conflict spike', {
+          body: `${a.name}: ${a.current} reports/24h (▲${a.delta})`,
+          tag: `vantage-${a.name}`,
+        })
+      } catch {
+        /* notifications best-effort */
+      }
+    }
+  }, [watchAlerts, notifyOn])
+
+  // User-initiated: request OS permission, then enable spike notifications.
+  const toggleNotify = async () => {
+    if (notifyOn) {
+      setNotifyOn(false)
+      saveNotify(false)
+      return
+    }
+    if (typeof Notification === 'undefined') return
+    let perm = Notification.permission
+    if (perm === 'default') perm = await Notification.requestPermission()
+    if (perm === 'granted') {
+      setNotifyOn(true)
+      saveNotify(true)
+    }
   }
 
   // Snapshot the global picture each refresh for the historical trends view.
@@ -848,6 +895,8 @@ export default function App() {
         onAdd={addWatch}
         onRemove={removeWatch}
         onAck={ackWatch}
+        notifyOn={notifyOn}
+        onToggleNotify={toggleNotify}
       />
       {helpOpen && (
         <div className="modal" onClick={() => setHelpOpen(false)}>

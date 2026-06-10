@@ -689,6 +689,35 @@ html, body, #root {
   cursor: pointer;
   font: inherit;
 }
+.watch-notify {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 14px;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: var(--txt);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.watch-notify:hover { border-color: var(--amber); }
+.watch-toggle {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--dim);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  padding: 2px 9px;
+}
+.watch-notify.on .watch-toggle {
+  color: var(--green);
+  border-color: rgba(61, 220, 151, 0.5);
+}
 .watch-empty { color: var(--dim2); font-size: 12px; padding: 10px 2px; line-height: 1.5; }
 .watch-rows { display: flex; flex-direction: column; gap: 5px; }
 .watch-row {

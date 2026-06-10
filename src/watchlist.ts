@@ -11,7 +11,24 @@ export interface WatchAlert {
 
 const WATCH_KEY = 'vantage.watch.v1'
 const BASE_KEY = 'vantage.watchbase.v1'
+const NOTIFY_KEY = 'vantage.notify.v1'
 const MAX = 40
+
+export function loadNotify(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveNotify(on: boolean): void {
+  try {
+    localStorage.setItem(NOTIFY_KEY, on ? '1' : '0')
+  } catch {
+    /* best-effort */
+  }
+}
 
 export function loadWatch(): string[] {
   try {

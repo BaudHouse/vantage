@@ -10,6 +10,8 @@ interface Props {
   onAdd: (name: string) => void
   onRemove: (name: string) => void
   onAck: () => void
+  notifyOn: boolean
+  onToggleNotify: () => void
 }
 
 export default function WatchlistModal({
@@ -21,6 +23,8 @@ export default function WatchlistModal({
   onAdd,
   onRemove,
   onAck,
+  notifyOn,
+  onToggleNotify,
 }: Props) {
   const [q, setQ] = useState('')
   const alerts = useMemo(
@@ -62,6 +66,15 @@ export default function WatchlistModal({
             ✕
           </button>
         </div>
+
+        <button
+          className={`watch-notify ${notifyOn ? 'on' : ''}`}
+          onClick={onToggleNotify}
+          aria-pressed={notifyOn}
+        >
+          <span>🔔 Desktop alerts on spikes</span>
+          <span className="watch-toggle">{notifyOn ? 'ON' : 'OFF'}</span>
+        </button>
 
         {watch.length === 0 ? (
           <div className="watch-empty">
