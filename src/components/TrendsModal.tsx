@@ -1,23 +1,11 @@
 import { useState } from 'react'
-import { getTrends } from '../trends'
+import { getTrends, TREND_METRICS as METRICS } from '../trends'
+import { detectAnomalies } from '../anomaly'
 
 interface Props {
   open: boolean
   onClose: () => void
 }
-
-const METRICS: { key: string; label: string; color: string }[] = [
-  { key: 'active', label: 'Active conflict zones', color: '#ff4d4d' },
-  { key: 'tensions', label: 'Tension zones', color: '#ffb000' },
-  { key: 'quakes', label: 'Earthquakes (24h)', color: '#ffd24d' },
-  { key: 'hazards', label: 'Hazard alerts (GDACS)', color: '#ff9500' },
-  { key: 'storms', label: 'Tropical cyclones', color: '#4dd0e1' },
-  { key: 'fires', label: 'Wildfires', color: '#ff7a1a' },
-  { key: 'aircraft', label: 'Aircraft tracked', color: '#e8eefc' },
-  { key: 'ships', label: 'Vessels (AIS)', color: '#3ddc97' },
-  { key: 'alerts', label: 'Severe wx alerts (US)', color: '#ffd24d' },
-  { key: 'airquality', label: 'AQI stations', color: '#7e57c2' },
-]
 
 function Spark({
   values,
@@ -66,6 +54,7 @@ export default function TrendsModal({ open, onClose }: Props) {
         minute: '2-digit',
       })
     : ''
+  const anomalies = detectAnomalies(snaps, METRICS)
 
   return (
     <div className="modal" onClick={onClose}>
@@ -84,6 +73,25 @@ export default function TrendsModal({ open, onClose }: Props) {
           {span >= 60 ? `${(span / 60).toFixed(1)} h` : `${span} min`} · auto-logged
           each refresh
         </p>
+
+        {anomalies.length > 0 && (
+          <div className="ew-panel">
+            <div className="ew-title">
+              ⚠ EARLY WARNING · {anomalies.length} developing
+            </div>
+            {anomalies.map((a) => (
+              <div className="ew-row" key={a.key}>
+                <span className="ew-label">{a.label}</span>
+                <span className="ew-stat">
+                  <b>{a.current}</b>
+                  <em>
+                    {a.z >= 99 ? 'spike' : `${a.z}σ`} · ▲{a.pct}% vs {a.mean}
+                  </em>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {snaps.length < 2 ? (
           <div className="trends-empty">

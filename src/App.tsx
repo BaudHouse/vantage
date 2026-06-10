@@ -64,7 +64,8 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
 import { nearestCameras, scanCameras } from './vision'
-import { recordSnapshot } from './trends'
+import { recordSnapshot, getTrends, TREND_METRICS } from './trends'
+import { detectAnomalies } from './anomaly'
 import WatchlistModal from './components/WatchlistModal'
 import {
   loadWatch,
@@ -418,6 +419,12 @@ export default function App() {
     () => computeAlerts(watch, intensity, baseline),
     [watch, intensity, baseline],
   )
+  // Early-warning: abnormal spikes across any tracked metric, recomputed each
+  // time the snapshot history grows.
+  const anomalies = useMemo(
+    () => detectAnomalies(getTrends(), TREND_METRICS),
+    [updated],
+  )
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
   const addWatch = (name: string) => {
@@ -708,8 +715,19 @@ export default function App() {
           <button className="navbtn" onClick={openCameras}>
             📷 CAMS
           </button>
-          <button className="navbtn" onClick={() => setTrendsOpen(true)}>
+          <button
+            className={`navbtn ${anomalies.length ? 'alerting' : ''}`}
+            onClick={() => setTrendsOpen(true)}
+            title={
+              anomalies.length
+                ? `${anomalies.length} developing situation(s) detected`
+                : 'Historical trends'
+            }
+          >
             📈 TRENDS
+            {anomalies.length > 0 && (
+              <span className="nav-badge">{anomalies.length}</span>
+            )}
           </button>
           <button
             className={`navbtn ${watchAlerts.length ? 'alerting' : ''}`}

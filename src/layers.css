@@ -336,6 +336,51 @@
   font-size: 12px;
   margin: 6px 0 14px;
 }
+.ew-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 77, 77, 0.45);
+  background: rgba(255, 77, 77, 0.08);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+.ew-title {
+  color: #ff6b6b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+.ew-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ew-row:first-of-type {
+  border-top: 0;
+}
+.ew-label {
+  color: #e8eefc;
+  font-size: 12px;
+}
+.ew-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ew-stat b {
+  color: #fff;
+  font-size: 14px;
+}
+.ew-stat em {
+  font-style: normal;
+  color: #ff9a9a;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+}
 .trends-scrub {
   display: flex;
   align-items: center;
