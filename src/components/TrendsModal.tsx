@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { getTrends, TREND_METRICS as METRICS } from '../trends'
-import { detectAnomalies, type Anomaly } from '../anomaly'
+import { TREND_METRICS as METRICS, type Snapshot } from '../trends'
+import type { Anomaly } from '../anomaly'
 import { assessSituations, ollamaModel } from '../operator'
 import Markdown from './Markdown'
 
@@ -8,6 +8,11 @@ interface Props {
   open: boolean
   onClose: () => void
   getContext: () => string
+  // Snapshot history + detected anomalies are computed once in App (right
+  // after each snapshot is recorded) and passed down — the modal does no
+  // localStorage parsing or anomaly scanning of its own.
+  snaps: Snapshot[]
+  anomalies: Anomaly[]
 }
 
 function Spark({
@@ -40,7 +45,13 @@ function Spark({
   )
 }
 
-export default function TrendsModal({ open, onClose, getContext }: Props) {
+export default function TrendsModal({
+  open,
+  onClose,
+  getContext,
+  snaps,
+  anomalies,
+}: Props) {
   const [scrub, setScrub] = useState<number | null>(null)
   const [assess, setAssess] = useState<{
     busy?: boolean
@@ -67,21 +78,19 @@ export default function TrendsModal({ open, onClose, getContext }: Props) {
     setAssess(text ? { text } : { err: 'Operator unreachable.' })
   }
 
-  // Auto-assess on open when situations are developing, but only once per
-  // distinct anomaly set — so opening the panel repeatedly doesn't re-spam the
-  // model, while a genuinely new spike triggers a fresh read.
+  // Auto-assess while open when situations are developing, but only once per
+  // distinct anomaly set — reopening doesn't re-spam the model, while a
+  // genuinely new spike (even mid-session) triggers a fresh read.
   useEffect(() => {
-    if (!open) return
-    const anom = detectAnomalies(getTrends(), METRICS)
-    if (!anom.length) return
-    const sig = anom.map((a) => a.key).sort().join(',')
+    if (!open || !anomalies.length) return
+    const sig = anomalies.map((a) => a.key).sort().join(',')
     if (assessedSigRef.current === sig) return
     assessedSigRef.current = sig
-    void runAssess(anom)
+    void runAssess(anomalies)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, anomalies])
+
   if (!open) return null
-  const snaps = getTrends()
   const last = snaps.length - 1
   const idx = scrub == null ? last : Math.min(scrub, last)
   const atLive = idx >= last
@@ -95,7 +104,6 @@ export default function TrendsModal({ open, onClose, getContext }: Props) {
         minute: '2-digit',
       })
     : ''
-  const anomalies = detectAnomalies(snaps, METRICS)
 
   return (
     <div className="modal" onClick={onClose}>

@@ -2,6 +2,8 @@
 // crowd position; the user's own YES/NO vote is persisted in localStorage and
 // nudges the displayed odds. (All "premium" voting features unlocked.)
 
+import { loadJson, saveJson } from './storage'
+
 export type PredCategory = 'MIL' | 'GEO' | 'ECON' | 'CIVIL'
 
 export interface Market {
@@ -38,20 +40,12 @@ export const MARKETS: Market[] = [
 const GEN_KEY = 'vantage.genmarkets.v1'
 
 export function loadGenerated(): Market[] {
-  try {
-    const arr = JSON.parse(localStorage.getItem(GEN_KEY) || '[]')
-    return Array.isArray(arr) ? (arr as Market[]) : []
-  } catch {
-    return []
-  }
+  const arr = loadJson<Market[]>(GEN_KEY, [])
+  return Array.isArray(arr) ? arr : []
 }
 
 export function saveGenerated(markets: Market[]): void {
-  try {
-    localStorage.setItem(GEN_KEY, JSON.stringify(markets.slice(0, 12)))
-  } catch {
-    /* best-effort */
-  }
+  saveJson(GEN_KEY, markets.slice(0, 12))
 }
 
 /** Build durable Market rows from AI proposals (id, resolution date, votes). */
@@ -76,18 +70,14 @@ const KEY = 'vantage.votes.v1'
 type Votes = Record<string, 'yes' | 'no'>
 
 export function getVotes(): Votes {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || '{}')
-  } catch {
-    return {}
-  }
+  return loadJson<Votes>(KEY, {})
 }
 
 export function castVote(id: string, side: 'yes' | 'no'): Votes {
   const v = getVotes()
   if (v[id] === side) delete v[id]
   else v[id] = side
-  localStorage.setItem(KEY, JSON.stringify(v))
+  saveJson(KEY, v)
   return v
 }
 

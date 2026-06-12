@@ -7,19 +7,7 @@ import {
   computeAlerts,
 } from './watchlist'
 
-function installStorage() {
-  const map = new Map<string, string>()
-  ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
-    getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
-    setItem: (k: string, v: string) => void map.set(k, v),
-    removeItem: (k: string) => void map.delete(k),
-    clear: () => map.clear(),
-    key: (i: number) => [...map.keys()][i] ?? null,
-    get length() {
-      return map.size
-    },
-  } as Storage
-}
+import { installStorage } from './test-helpers'
 
 describe('watchlist persistence', () => {
   beforeEach(installStorage)

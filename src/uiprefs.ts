@@ -1,6 +1,8 @@
 // Persisted UI layout preferences so the operator's workspace survives a
 // reload — which rails are open, layer panel collapse, and density.
 
+import { loadJson, saveJson } from './storage'
+
 export type Density = 'cozy' | 'compact'
 
 export interface UiPrefs {
@@ -19,41 +21,23 @@ const DEFAULTS: UiPrefs = {
 }
 
 export function loadUi(): UiPrefs {
-  try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
-  } catch {
-    return { ...DEFAULTS }
-  }
+  return { ...DEFAULTS, ...loadJson<Partial<UiPrefs>>(KEY, {}) }
 }
 
 export function saveUi(patch: Partial<UiPrefs>): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...loadUi(), ...patch }))
-  } catch {
-    /* private mode / quota — prefs are best-effort */
-  }
+  saveJson(KEY, { ...loadUi(), ...patch })
 }
 
 // Which layers the operator had switched on, remembered across reloads.
 const LAYERS_KEY = 'vantage.layers.v1'
 
 export function loadActiveLayers(): string[] | null {
-  try {
-    const raw = localStorage.getItem(LAYERS_KEY)
-    if (!raw) return null
-    const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? (arr as string[]) : null
-  } catch {
-    return null
-  }
+  const arr = loadJson<string[] | null>(LAYERS_KEY, null)
+  return Array.isArray(arr) ? arr : null
 }
 
 export function saveActiveLayers(ids: string[]): void {
-  try {
-    localStorage.setItem(LAYERS_KEY, JSON.stringify(ids))
-  } catch {
-    /* best-effort */
-  }
+  saveJson(LAYERS_KEY, ids)
 }
 
 // One-time onboarding hint that surfaces the globe-click AI sitrep.

@@ -64,8 +64,14 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
 import { nearestCameras, scanCameras } from './vision'
-import { recordSnapshot, getTrends, TREND_METRICS } from './trends'
-import { detectAnomalies } from './anomaly'
+import {
+  recordSnapshot,
+  getTrends,
+  TREND_METRICS,
+  type Snapshot,
+} from './trends'
+import { detectAnomalies, type Anomaly } from './anomaly'
+import { useNotifyOnce } from './useNotifyOnce'
 import WatchlistModal from './components/WatchlistModal'
 import {
   loadWatch,
@@ -419,11 +425,13 @@ export default function App() {
     () => computeAlerts(watch, intensity, baseline),
     [watch, intensity, baseline],
   )
-  // Early-warning: abnormal spikes across any tracked metric, recomputed each
-  // time the snapshot history grows.
-  const anomalies = useMemo(
-    () => detectAnomalies(getTrends(), TREND_METRICS),
-    [updated],
+  // Early-warning state. Recomputed in the snapshot effect below — AFTER the
+  // new snapshot is recorded — so a fresh spike badges on THIS refresh. (A
+  // useMemo here would run during render, before the effect that records the
+  // snapshot, and read one-refresh-stale history.)
+  const [snaps, setSnaps] = useState<Snapshot[]>(() => getTrends())
+  const [anomalies, setAnomalies] = useState<Anomaly[]>(() =>
+    detectAnomalies(snaps, TREND_METRICS),
   )
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
@@ -446,6 +454,14 @@ export default function App() {
       saveWatch(next)
       return next
     })
+    // Drop its baseline too so unwatched regions don't leave stale entries.
+    setBaseline((prev) => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      saveBaseline(next)
+      return next
+    })
   }
   // Acknowledge: re-baseline every watched region to its current level.
   const ackWatch = () => {
@@ -457,63 +473,35 @@ export default function App() {
     })
   }
 
-  // Fire a desktop notification the first time each region crosses into an
-  // alerting state (cleared again once it drops out / is acknowledged).
-  const notifiedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const live = new Set(watchAlerts.map((a) => a.name))
-    for (const n of [...notifiedRef.current]) {
-      if (!live.has(n)) notifiedRef.current.delete(n)
-    }
-    if (
-      !notifyOn ||
-      typeof Notification === 'undefined' ||
-      Notification.permission !== 'granted'
-    )
-      return
-    for (const a of watchAlerts) {
-      if (notifiedRef.current.has(a.name)) continue
-      notifiedRef.current.add(a.name)
-      try {
-        new Notification('VANTAGE · conflict spike', {
+  // Desktop notifications: fire once when a region crosses into an alerting
+  // state, and once when a new developing situation (anomaly) is detected.
+  // Keys re-arm when the item subsides / is acknowledged.
+  useNotifyOnce(
+    useMemo(
+      () =>
+        watchAlerts.map((a) => ({
+          key: `vantage-${a.name}`,
+          title: 'VANTAGE · conflict spike',
           body: `${a.name}: ${a.current} reports/24h (▲${a.delta})`,
-          tag: `vantage-${a.name}`,
-        })
-      } catch {
-        /* notifications best-effort */
-      }
-    }
-  }, [watchAlerts, notifyOn])
-
-  // Same opt-in also pushes a notification when a NEW developing situation
-  // (anomaly) is detected — early warning that reaches you, not just the panel.
-  const notifiedAnomRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const live = new Set(anomalies.map((a) => a.key))
-    for (const k of [...notifiedAnomRef.current]) {
-      if (!live.has(k)) notifiedAnomRef.current.delete(k)
-    }
-    if (
-      !notifyOn ||
-      typeof Notification === 'undefined' ||
-      Notification.permission !== 'granted'
-    )
-      return
-    for (const a of anomalies) {
-      if (notifiedAnomRef.current.has(a.key)) continue
-      notifiedAnomRef.current.add(a.key)
-      try {
-        new Notification('VANTAGE · developing situation', {
+        })),
+      [watchAlerts],
+    ),
+    notifyOn,
+  )
+  useNotifyOnce(
+    useMemo(
+      () =>
+        anomalies.map((a) => ({
+          key: `vantage-anom-${a.key}`,
+          title: 'VANTAGE · developing situation',
           body: `${a.label}: ${a.current} (${
             a.z >= 99 ? 'spike' : `${a.z}σ`
           }, ▲${a.pct}% vs baseline)`,
-          tag: `vantage-anom-${a.key}`,
-        })
-      } catch {
-        /* best-effort */
-      }
-    }
-  }, [anomalies, notifyOn])
+        })),
+      [anomalies],
+    ),
+    notifyOn,
+  )
 
   // User-initiated: request OS permission, then enable spike notifications.
   const toggleNotify = async () => {
@@ -531,10 +519,11 @@ export default function App() {
     }
   }
 
-  // Snapshot the global picture each refresh for the historical trends view.
+  // Snapshot the global picture each refresh, then recompute the early-warning
+  // anomalies from the EXACT history just recorded (no stale re-read).
   useEffect(() => {
     if (!updated) return
-    recordSnapshot({
+    const next = recordSnapshot({
       active: stats.active,
       tensions: stats.tensions,
       quakes: events.filter((e) => e.kind === 'quake').length,
@@ -546,6 +535,8 @@ export default function App() {
       alerts: wxAlerts.length,
       airquality: airQuality.length,
     })
+    setSnaps(next)
+    setAnomalies(detectAnomalies(next, TREND_METRICS))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updated])
 
@@ -941,6 +932,8 @@ export default function App() {
         open={trendsOpen}
         onClose={() => setTrendsOpen(false)}
         getContext={getContext}
+        snaps={snaps}
+        anomalies={anomalies}
       />
       <WatchlistModal
         open={watchOpen}

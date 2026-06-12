@@ -13,6 +13,60 @@ const PREFERRED = ['qwen2.5:14b', 'qwen2.5:7b', 'llama3.2:3b', 'llama3.2']
 export interface ChatMsg {
   role: 'system' | 'user' | 'assistant'
   content: string
+  images?: string[] // base64 frames, for vision models
+}
+
+// ---- single-flight queue --------------------------------------------------
+// Every chat call funnels through one promise chain. A local Ollama generates
+// one response at a time (OLLAMA_NUM_PARALLEL defaults to 1); firing requests
+// concurrently just parks the extras in Ollama's queue while their CLIENT
+// timeouts keep ticking — so the third simultaneous caller (auto-seed + trends
+// assess + briefing outlook) times out spuriously. Serializing client-side
+// makes each call's timeout measure its own generation only.
+
+let chain: Promise<unknown> = Promise.resolve()
+
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = chain.then(job, job)
+  chain = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+interface ChatOpts {
+  temperature?: number
+  numCtx?: number
+  ms?: number
+}
+
+/** One queued POST /api/chat round-trip; returns assistant text or null. */
+async function chat(
+  model: string,
+  messages: ChatMsg[],
+  opts: ChatOpts = {},
+): Promise<string | null> {
+  return enqueue(async () => {
+    try {
+      const options: Record<string, number> = {}
+      if (opts.temperature !== undefined) options.temperature = opts.temperature
+      if (opts.numCtx !== undefined) options.num_ctx = opts.numCtx
+      const body: Record<string, unknown> = { model, messages, stream: false }
+      if (Object.keys(options).length) body.options = options
+      const r = await rawFetch(`${OLLAMA}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        ms: opts.ms ?? 120000,
+      })
+      if (!r || !r.ok) return null
+      const j = await r.json()
+      return (j?.message?.content as string) ?? null
+    } catch {
+      return null
+    }
+  })
 }
 
 export async function ollamaModel(): Promise<string | null> {
@@ -67,27 +121,14 @@ export async function analyzeImage(
   imageBase64: string,
   context: string,
 ): Promise<string | null> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: VISION_SYSTEM },
-          { role: 'user', content: context, images: [imageBase64] },
-        ],
-        stream: false,
-        options: { temperature: 0.3 },
-      }),
-      ms: 180000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    return j?.message?.content ?? null
-  } catch {
-    return null
-  }
+  return chat(
+    model,
+    [
+      { role: 'system', content: VISION_SYSTEM },
+      { role: 'user', content: context, images: [imageBase64] },
+    ],
+    { temperature: 0.3, ms: 180000 },
+  )
 }
 
 const AREA_SYSTEM = `You are VANTAGE Operator producing a SITUATIONAL REPORT from
@@ -103,29 +144,16 @@ export async function analyzeArea(
   images: string[],
   context: string,
 ): Promise<string | null> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: AREA_SYSTEM },
-          { role: 'user', content: context, images },
-        ],
-        stream: false,
-        // Several images + a structured report need a big context window;
-        // Ollama's default is too small and silently truncates/errors.
-        options: { temperature: 0.3, num_ctx: 16384 },
-      }),
-      ms: 240000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    return j?.message?.content ?? null
-  } catch {
-    return null
-  }
+  return chat(
+    model,
+    [
+      { role: 'system', content: AREA_SYSTEM },
+      { role: 'user', content: context, images },
+    ],
+    // Several images + a structured report need a big context window;
+    // Ollama's default is too small and silently truncates/errors.
+    { temperature: 0.3, numCtx: 16384, ms: 240000 },
+  )
 }
 
 const SYSTEM = `You are VANTAGE Operator — a senior all-source intelligence analyst
@@ -180,31 +208,17 @@ export async function forecastOutlook(
   model: string,
   context: string,
 ): Promise<string | null> {
-  try {
-    const messages: ChatMsg[] = [
+  return chat(
+    model,
+    [
       { role: 'system', content: OUTLOOK_SYSTEM },
       {
         role: 'user',
         content: `LIVE SITUATION:\n${context}\n\nForward look (next 24-72h):`,
       },
-    ]
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: { temperature: 0.5 },
-      }),
-      ms: 120000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    return (j?.message?.content as string) ?? null
-  } catch {
-    return null
-  }
+    ],
+    { temperature: 0.5 },
+  )
 }
 
 /** Ask the model to interpret a set of detected anomalies / developing spikes. */
@@ -213,8 +227,9 @@ export async function assessSituations(
   spikes: string[],
   context: string,
 ): Promise<string | null> {
-  try {
-    const messages: ChatMsg[] = [
+  return chat(
+    model,
+    [
       { role: 'system', content: ASSESS_SYSTEM },
       {
         role: 'user',
@@ -222,24 +237,9 @@ export async function assessSituations(
           .map((s) => `- ${s}`)
           .join('\n')}\n\nLIVE SITUATION:\n${context}\n\nAssess:`,
       },
-    ]
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: { temperature: 0.4 },
-      }),
-      ms: 120000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    return (j?.message?.content as string) ?? null
-  } catch {
-    return null
-  }
+    ],
+    { temperature: 0.4 },
+  )
 }
 
 /** Ask the local model to forecast a single prediction-market question. */
@@ -248,37 +248,22 @@ export async function forecastMarket(
   question: string,
   context: string,
 ): Promise<Forecast | null> {
-  try {
-    const messages: ChatMsg[] = [
+  const text = await chat(
+    model,
+    [
       { role: 'system', content: FORECAST_SYSTEM },
       {
         role: 'user',
         content: `QUESTION: ${question}\n\nLIVE SITUATION:\n${context}\n\nYour calibrated assessment:`,
       },
-    ]
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: { temperature: 0.5 },
-      }),
-      ms: 120000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    const text: string = j?.message?.content ?? ''
-    const m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/)
-    const probability = m
-      ? Math.max(1, Math.min(99, Number(m[1])))
-      : 50
-    const rationale = text.replace(/P:\s*[0-9.]+\s*%?/i, '').trim()
-    return { probability, rationale }
-  } catch {
-    return null
-  }
+    ],
+    { temperature: 0.5 },
+  )
+  if (text == null) return null
+  const m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/)
+  const probability = m ? Math.max(1, Math.min(99, Number(m[1]))) : 50
+  const rationale = text.replace(/P:\s*[0-9.]+\s*%?/i, '').trim()
+  return { probability, rationale }
 }
 
 const PROPOSE_SYSTEM = `You are VANTAGE's forecasting desk. From the LIVE global
@@ -341,36 +326,23 @@ export async function proposeMarkets(
   context: string,
   existing: string[],
 ): Promise<ProposedMarket[]> {
-  try {
-    const sys = PROPOSE_SYSTEM.replace('{EXISTING}', existing.slice(0, 10).join(' | '))
-    const messages: ChatMsg[] = [
+  const sys = PROPOSE_SYSTEM.replace('{EXISTING}', existing.slice(0, 10).join(' | '))
+  // NOTE: deliberately NOT using Ollama's format:'json' here — for a top-level
+  // array it collapses the items into one flat object with duplicate keys.
+  // Plain generation yields a real JSON array, which parseProposed extracts
+  // (it also recovers an array embedded in any stray prose).
+  const text = await chat(
+    model,
+    [
       { role: 'system', content: sys },
       {
         role: 'user',
         content: `LIVE SITUATION:\n${context}\n\nReturn the JSON array now:`,
       },
-    ]
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // NOTE: deliberately NOT using Ollama's format:'json' here — for a top-
-      // level array it collapses the items into one flat object with duplicate
-      // keys. Plain generation yields a real JSON array, which parseProposed
-      // extracts (it also recovers an array embedded in any stray prose).
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: { temperature: 0.8 },
-      }),
-      ms: 120000,
-    })
-    if (!r || !r.ok) return []
-    const j = await r.json()
-    return parseProposed(j?.message?.content ?? '')
-  } catch {
-    return []
-  }
+    ],
+    { temperature: 0.8 },
+  )
+  return parseProposed(text ?? '')
 }
 
 /**
@@ -383,21 +355,8 @@ export async function askOperator(
   history: ChatMsg[],
   context: string,
 ): Promise<string | null> {
-  try {
-    const messages: ChatMsg[] = [
-      { role: 'system', content: `${SYSTEM}\n\nCURRENT SITUATION:\n${context}` },
-      ...history,
-    ]
-    const r = await rawFetch(`${OLLAMA}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: false }),
-      ms: 120000,
-    })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    return j?.message?.content ?? null
-  } catch {
-    return null
-  }
+  return chat(model, [
+    { role: 'system', content: `${SYSTEM}\n\nCURRENT SITUATION:\n${context}` },
+    ...history,
+  ])
 }

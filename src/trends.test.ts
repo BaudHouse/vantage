@@ -1,21 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { recordSnapshot, getTrends, clearTrends } from './trends'
-
-// Minimal in-memory localStorage so these pure helpers can run under the
-// default node test environment (no jsdom dependency).
-function installStorage() {
-  const map = new Map<string, string>()
-  ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
-    getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
-    setItem: (k: string, v: string) => void map.set(k, v),
-    removeItem: (k: string) => void map.delete(k),
-    clear: () => map.clear(),
-    key: (i: number) => [...map.keys()][i] ?? null,
-    get length() {
-      return map.size
-    },
-  } as Storage
-}
+import { installStorage } from './test-helpers'
 
 describe('trends', () => {
   beforeEach(() => {

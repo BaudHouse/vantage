@@ -2,6 +2,8 @@
 // there rises above the level you last acknowledged. Turns the passive board
 // into a proactive monitor. All state is local (localStorage), no backend.
 
+import { loadJson, saveJson } from './storage'
+
 export interface WatchAlert {
   name: string
   current: number
@@ -31,40 +33,21 @@ export function saveNotify(on: boolean): void {
 }
 
 export function loadWatch(): string[] {
-  try {
-    const a = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
-    return Array.isArray(a) ? (a as string[]) : []
-  } catch {
-    return []
-  }
+  const a = loadJson<string[]>(WATCH_KEY, [])
+  return Array.isArray(a) ? a : []
 }
 
 export function saveWatch(names: string[]): void {
-  try {
-    localStorage.setItem(
-      WATCH_KEY,
-      JSON.stringify([...new Set(names)].slice(0, MAX)),
-    )
-  } catch {
-    /* best-effort */
-  }
+  saveJson(WATCH_KEY, [...new Set(names)].slice(0, MAX))
 }
 
 export function loadBaseline(): Record<string, number> {
-  try {
-    const o = JSON.parse(localStorage.getItem(BASE_KEY) || '{}')
-    return o && typeof o === 'object' ? (o as Record<string, number>) : {}
-  } catch {
-    return {}
-  }
+  const o = loadJson<Record<string, number>>(BASE_KEY, {})
+  return o && typeof o === 'object' && !Array.isArray(o) ? o : {}
 }
 
 export function saveBaseline(counts: Record<string, number>): void {
-  try {
-    localStorage.setItem(BASE_KEY, JSON.stringify(counts))
-  } catch {
-    /* best-effort */
-  }
+  saveJson(BASE_KEY, counts)
 }
 
 /**
