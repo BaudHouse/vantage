@@ -160,17 +160,27 @@ export default function TrendsModal({
             <div className="ew-title">
               ⚠ EARLY WARNING · {anomalies.length} developing
             </div>
-            {anomalies.map((a) => (
-              <div className="ew-row" key={a.key}>
-                <span className="ew-label">{a.label}</span>
-                <span className="ew-stat">
-                  <b>{a.current}</b>
-                  <em>
-                    {a.z >= 99 ? 'spike' : `${a.z}σ`} · ▲{a.pct}% vs {a.mean}
-                  </em>
-                </span>
-              </div>
-            ))}
+            {anomalies.map((a) => {
+              const fc = forecasts[a.key]
+              const proj =
+                fc?.trained && fc.predictions.length
+                  ? fc.predictions.join(' · ')
+                  : ''
+              return (
+                <div className="ew-row" key={a.key}>
+                  <span className="ew-label">
+                    {a.label}
+                    {proj && <em className="ew-proj">🧠 → {proj}</em>}
+                  </span>
+                  <span className="ew-stat">
+                    <b>{a.current}</b>
+                    <em>
+                      {a.z >= 99 ? 'spike' : `${a.z}σ`} · ▲{a.pct}% vs {a.mean}
+                    </em>
+                  </span>
+                </div>
+              )
+            })}
             <div className="ew-actions">
               <button
                 className="ew-assess"

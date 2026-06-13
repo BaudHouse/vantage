@@ -548,6 +548,15 @@
 .ew-label {
   color: #e8eefc;
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ew-proj {
+  font-style: normal;
+  font-size: 10px;
+  color: #8da0ba;
+  font-variant-numeric: tabular-nums;
 }
 .ew-stat {
   display: flex;
