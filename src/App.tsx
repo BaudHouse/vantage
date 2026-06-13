@@ -63,6 +63,7 @@ import KeySetup from './components/KeySetup'
 import ErrorBoundary from './components/ErrorBoundary'
 import Markdown from './components/Markdown'
 import TrendsModal from './components/TrendsModal'
+import ButterflyModal from './components/ButterflyModal'
 import { nearestCameras, scanCameras } from './vision'
 import {
   recordSnapshot,
@@ -135,6 +136,8 @@ export default function App() {
   const [gallery, setGallery] = useState(false)
   const [keySetup, setKeySetup] = useState(false)
   const [trendsOpen, setTrendsOpen] = useState(false)
+  const [butterfly, setButterfly] = useState({ open: false, seed: '' })
+  const openButterfly = (seed = '') => setButterfly({ open: true, seed })
   const [helpOpen, setHelpOpen] = useState(false)
   const [showHint, setShowHint] = useState(() => !hintSeen())
   const [watchOpen, setWatchOpen] = useState(false)
@@ -762,6 +765,9 @@ export default function App() {
           <button className="navbtn" onClick={openBriefing}>
             ◫ BRIEFING
           </button>
+          <button className="navbtn" onClick={() => openButterfly()}>
+            🦋 CASCADE
+          </button>
           <button className="navbtn" onClick={load} disabled={loading}>
             ↻ {loading ? 'SYNC…' : 'REFRESH'}
           </button>
@@ -863,6 +869,10 @@ export default function App() {
               entity={selected}
               onClose={() => setSelected(null)}
               onAsk={askAbout}
+              onCascade={(seed) => {
+                setSelected(null)
+                openButterfly(seed)
+              }}
             />
           )}
           {areaScan && (
@@ -934,6 +944,12 @@ export default function App() {
         getContext={getContext}
         snaps={snaps}
         anomalies={anomalies}
+      />
+      <ButterflyModal
+        open={butterfly.open}
+        seed={butterfly.seed}
+        onClose={() => setButterfly((s) => ({ ...s, open: false }))}
+        getContext={getContext}
       />
       <WatchlistModal
         open={watchOpen}

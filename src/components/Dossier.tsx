@@ -25,6 +25,7 @@ interface Props {
   entity: Entity | null
   onClose: () => void
   onAsk: (e: Entity) => void
+  onCascade: (seed: string) => void
 }
 
 interface Row {
@@ -94,7 +95,7 @@ function eventRows(e: GeoEvent): Row[] {
   return rows
 }
 
-export default function Dossier({ entity, onClose, onAsk }: Props) {
+export default function Dossier({ entity, onClose, onAsk, onCascade }: Props) {
   // Refresh a selected camera: ~1s for truly-live NYC feeds, slower for stills.
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -298,6 +299,12 @@ export default function Dossier({ entity, onClose, onAsk }: Props) {
       <div className="dossier-actions">
         <button className="dossier-ask" onClick={() => onAsk(e)}>
           ◉ Ask Operator about this
+        </button>
+        <button
+          className="dossier-ask bf"
+          onClick={() => onCascade(entityTitle(e))}
+        >
+          🦋 Trace cascade
         </button>
         {safeUrl(url) && (
           <a

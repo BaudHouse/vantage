@@ -42,7 +42,7 @@ interface ChatOpts {
 }
 
 /** One queued POST /api/chat round-trip; returns assistant text or null. */
-async function chat(
+export async function chat(
   model: string,
   messages: ChatMsg[],
   opts: ChatOpts = {},
