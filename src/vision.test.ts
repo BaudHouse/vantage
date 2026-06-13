@@ -1,16 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { nearestCameras } from './vision'
+import {
+  nearestCameras,
+  camsMatchingText,
+  mightHaveCams,
+} from './vision'
 import type { Camera } from './layers'
 
-function cam(id: string, lat: number, lng: number): Camera {
+function cam(
+  id: string,
+  lat: number,
+  lng: number,
+  region = '',
+  name = id,
+  road = '',
+): Camera {
   return {
     kind: 'camera',
     id,
     lat,
     lng,
-    name: id,
-    road: '',
-    region: '',
+    name,
+    road,
+    region,
     image: '',
     source: '',
     live: true,
@@ -55,5 +66,42 @@ describe('nearestCameras', () => {
 
   it('handles an empty camera list', () => {
     expect(nearestCameras([], 0, 0)).toEqual([])
+  })
+})
+
+describe('camsMatchingText', () => {
+  const cams = [
+    cam('a', 40.7, -74, 'New York · Manhattan', '5th Ave & 42nd St'),
+    cam('b', 51.5, -0.1, 'London', 'A40 Westway'),
+    cam('c', 34.0, -118, 'California · Los Angeles', 'I-405 / Sepulveda'),
+  ]
+
+  it('matches cameras by region/name words in the question', () => {
+    expect(
+      camsMatchingText("what's traffic like in Manhattan?", cams).map(
+        (c) => c.id,
+      ),
+    ).toEqual(['a'])
+    expect(
+      camsMatchingText('is London moving right now', cams).map((c) => c.id),
+    ).toEqual(['b'])
+    expect(
+      camsMatchingText('show me Los Angeles freeways', cams).map((c) => c.id),
+    ).toEqual(['c'])
+  })
+
+  it('returns nothing when no area words match', () => {
+    expect(camsMatchingText('assess the global situation', cams)).toEqual([])
+  })
+})
+
+describe('mightHaveCams', () => {
+  it('flags questions about covered areas', () => {
+    expect(mightHaveCams('how is traffic in New York')).toBe(true)
+    expect(mightHaveCams('London bridge status')).toBe(true)
+    expect(mightHaveCams('any California freeway closures')).toBe(true)
+  })
+  it('is false for unrelated questions', () => {
+    expect(mightHaveCams('what is the oil price outlook')).toBe(false)
   })
 })

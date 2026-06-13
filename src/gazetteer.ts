@@ -297,3 +297,28 @@ export function resolvePlace(
   }
   return null
 }
+
+/**
+ * Free-text place lookup for ad-hoc questions ("what's happening in Kyiv?").
+ * Scans the gazetteer for a city/region first (highest rank wins), then a
+ * named country. Returns null if no known place is mentioned.
+ */
+export function findPlace(
+  text: string,
+): { lat: number; lng: number; place: string } | null {
+  const t = ` ${(text || '').toLowerCase()} `
+  let best: Place | null = null
+  for (const { alias, place } of ALIAS_INDEX) {
+    if (hasWord(t, alias)) {
+      if (!best || place.rank > best.rank) best = place
+      if (best.rank === 3) break
+    }
+  }
+  if (best) return { lat: best.lat, lng: best.lng, place: best.name }
+  for (const { alias, country } of COUNTRY_INDEX) {
+    if (hasWord(t, alias)) {
+      return { lat: country.lat, lng: country.lng, place: country.ne }
+    }
+  }
+  return null
+}

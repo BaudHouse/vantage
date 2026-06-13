@@ -17,6 +17,43 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number): numb
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
+// Hint that a question might reference an area our keyless cams cover (NYC /
+// London / California), so the Operator knows to load + check cameras.
+const CAM_AREA_HINTS =
+  /\b(new york|nyc|manhattan|brooklyn|queens|bronx|harlem|times square|london|england|california|los angeles|san francisco|sacramento|san diego|oakland|caltrans|freeway|interstate|traffic|road|street|highway|webcam|camera)\b/i
+
+export function mightHaveCams(text: string): boolean {
+  return CAM_AREA_HINTS.test(text)
+}
+
+/**
+ * Cameras whose region/name/road words appear in the question text — covers
+ * the cities our cameras actually live in (which a conflict gazetteer won't
+ * have). Scored by number of matching tokens, best first.
+ */
+export function camsMatchingText(
+  text: string,
+  cams: Camera[],
+  n = 3,
+): Camera[] {
+  const q = ` ${text.toLowerCase()} `
+  const scored = cams
+    .map((c) => {
+      const toks = new Set(
+        `${c.region} ${c.name} ${c.road}`
+          .toLowerCase()
+          .split(/[^a-z]+/)
+          .filter((w) => w.length >= 4),
+      )
+      let score = 0
+      for (const tok of toks) if (q.includes(tok)) score++
+      return { c, score }
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+  return scored.slice(0, n).map((x) => x.c)
+}
+
 /** Cameras nearest a point, closest first (optionally within maxKm). */
 export function nearestCameras(
   cams: Camera[],

@@ -924,6 +924,7 @@ export default function App() {
 
       <OperatorChat
         getContext={getContext}
+        cameras={cameras}
         focus={focus}
         entityContext={entityContext}
       />

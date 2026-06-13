@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { askOperator, ollamaModel, type ChatMsg } from '../operator'
-import { entityTitle, type Entity } from '../layers'
+import { entityTitle, type Camera, type Entity } from '../layers'
+import { findPlace } from '../gazetteer'
+import { fetchCameras } from '../cameras'
+import {
+  nearestCameras,
+  camsMatchingText,
+  mightHaveCams,
+  scanCameras,
+} from '../vision'
 import Markdown from './Markdown'
 
 interface Props {
   getContext: () => string
+  cameras: Camera[]
   focus?: { entity: Entity; n: number } | null
   entityContext?: (e: Entity) => string
 }
 
 export default function OperatorChat({
   getContext,
+  cameras,
   focus,
   entityContext,
 }: Props) {
@@ -18,12 +28,17 @@ export default function OperatorChat({
   const [model, setModel] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [camStatus, setCamStatus] = useState('')
   const [input, setInput] = useState('')
+  const camerasRef = useRef(cameras)
+  useEffect(() => {
+    camerasRef.current = cameras
+  }, [cameras])
   const [msgs, setMsgs] = useState<ChatMsg[]>([
     {
       role: 'assistant',
       content:
-        'VANTAGE Operator online. Ask me to assess the current situation, a region, the markets, or click any tracked entity → “Ask Operator”.',
+        'VANTAGE Operator online. Ask me to assess the situation, a region, or the markets. Ask about a place with live cameras nearby and I’ll pull a visual check before answering. Or click any tracked entity → “Ask Operator”.',
     },
   ])
   const endRef = useRef<HTMLDivElement>(null)
@@ -70,11 +85,50 @@ export default function OperatorChat({
       setBusy(false)
       return
     }
+    // Agentic tool-use: if the question names a place we have live cameras
+    // near, pull a vision sitrep from them and fold it into the model's context
+    // so the answer reflects CURRENT ground truth, not just the feed counts.
+    let camNote = ''
+    const place = findPlace(text)
+    const wantCams = !!place || mightHaveCams(text)
+    // Use the layer's cameras if loaded; otherwise fetch the keyless set on
+    // demand (cached) so the check works even with the camera layer off.
+    let camList = camerasRef.current
+    if (wantCams && !camList.length) {
+      setCamStatus('📷 loading cameras…')
+      try {
+        camList = await fetchCameras()
+        camerasRef.current = camList
+      } catch {
+        camList = []
+      }
+    }
+    // Prefer cameras whose own region/name matches the question (covers the
+    // cities our cams cover); fall back to whatever's geographically nearest a
+    // gazetteer place (covers conflict zones that happen to have cams nearby).
+    let cams = camsMatchingText(text, camList, 3)
+    if (!cams.length && place) {
+      cams = nearestCameras(camList, place.lat, place.lng, 3, 200)
+    }
+    const label = cams.length
+      ? cams[0].region || cams[0].name || place?.place || 'the area'
+      : ''
+    if (cams.length) {
+      setCamStatus(`📷 checking ${cams.length} live cameras near ${label}…`)
+      const { result } = await scanCameras(cams, label, (s) =>
+        setCamStatus(`📷 ${label}: ${s}`),
+      )
+      setCamStatus('')
+      if (result && !result.startsWith('⚠') && !/no cameras/i.test(result)) {
+        camNote = `LIVE CAMERA CHECK near ${label} (${cams.length} feed${
+          cams.length > 1 ? 's' : ''
+        }, just now):\n${result}`
+      }
+    }
+
     const history = next.filter((x) => x.role !== 'system').slice(-8)
-    const context = extraContext
-      ? `${getContext()}\n\n${extraContext}`
-      : getContext()
-    const reply = await askOperator(m, history, context)
+    const parts = [getContext(), camNote, extraContext].filter(Boolean)
+    const reply = await askOperator(m, history, parts.join('\n\n'))
     setMsgs([
       ...next,
       {
@@ -130,7 +184,11 @@ export default function OperatorChat({
                 {m.role === 'assistant' ? <Markdown text={m.content} /> : m.content}
               </div>
             ))}
-            {busy && <div className="op-msg assistant dim">analyzing…</div>}
+            {busy && (
+              <div className="op-msg assistant dim">
+                {camStatus || 'analyzing…'}
+              </div>
+            )}
             <div ref={endRef} />
           </div>
           <div className="op-input">
