@@ -29,6 +29,37 @@ weather-radar layers, and a local Ollama model reasons over all of it.
   (with live image), an "Ask Operator about this" action, and a searchable
   camera gallery.
 
+### Prediction stack — "track everything → detect → predict"
+
+- **Early-warning engine.** Every metric's history is snapshotted each refresh;
+  a z-score anomaly detector (rising-only, with an absolute floor so flat
+  metrics can't false-positive) flags what's *statistically abnormal* and badges
+  it on the TRENDS button (`src/anomaly.ts`, unit-tested).
+- **In-browser neural forecaster.** A faithful TypeScript port of
+  [Bikebrainz/NeuralNetwork](https://github.com/Bikebrainz/NeuralNetwork) — the
+  overhauled Urschel **sunspot backprop net** (MLP, SGD+momentum, min/max
+  normalization, windowed open/closed-loop forecasting) — **trains in the
+  browser** on each metric's live history and projects the next steps, scored
+  against a naive-persistence baseline (`skill = 1 − net/naive`). No backend,
+  no GPU. Unit-tested incl. the golden checks (learns XOR, beats persistence on
+  a sine wave). *(`src/nn.ts`)*
+- **Butterfly-effect cascade.** Enter any trigger and the local model maps how
+  it cascades into compounding cross-domain effect chains
+  (MIL/ECON/CIVIL/ENERGY/CYBER/DIPLO/SUPPLY), each step with a conditional
+  likelihood; the product is the chain's compounded probability. Reachable from
+  a nav button, any dossier entity, or a developing situation. *(`src/cascade.ts`)*
+- **AI assessment & 24–72h outlook.** Developing situations are auto-assessed
+  (driver + what's next, anchored to the neural projection); the daily briefing
+  auto-runs a calibrated Likely/Possible/Watch forward forecast.
+- **Watchlist + desktop alerts.** Pin regions; get an in-app badge *and* an OS
+  notification when conflict activity or any metric spikes past your baseline.
+- **Agentic camera verification.** Ask the Operator about a place with cameras
+  nearby and it **pulls the live feeds, runs vision on them, and answers from
+  current ground truth** ("traffic light, clear skies, construction crew on the
+  bridge") — not just feed counts.
+- All AI calls funnel through one **single-flight queue** so a local Ollama
+  instance is never overloaded by concurrent auto-triggers.
+
 ## Architecture
 
 - **Vite + React 19 + TypeScript**, `react-globe.gl` + `three` for the globe
