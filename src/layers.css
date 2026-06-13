@@ -558,6 +558,50 @@
   color: #8da0ba;
   font-variant-numeric: tabular-nums;
 }
+.surprise-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(192, 139, 255, 0.4);
+  background: rgba(192, 139, 255, 0.07);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+.surprise-title {
+  color: #c08bff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+.surprise-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.surprise-row:first-of-type {
+  border-top: 0;
+}
+.surprise-label {
+  color: #e8eefc;
+  font-size: 12px;
+}
+.surprise-stat {
+  color: #8da0ba;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.surprise-stat b {
+  color: #fff;
+  font-size: 13px;
+}
+.surprise-stat em {
+  font-style: normal;
+  color: #d9c4ff;
+  margin-left: 8px;
+  font-weight: 700;
+}
 .ew-stat {
   display: flex;
   align-items: baseline;

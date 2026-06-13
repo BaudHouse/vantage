@@ -156,6 +156,11 @@ export interface SeriesForecast {
   naiveRmse: number // persistence baseline RMSE on the same tail
   skill: number // 1 - netRmse/naiveRmse  (>0 means it beats persistence)
   trained: boolean // false if not enough history
+  // "forecast surprise": the latest observed value vs what the model expected,
+  // in units of the model's own typical error. A large surprise on a model that
+  // is otherwise skilful means the learned pattern just broke — a leading signal.
+  predictedLast: number // model's 1-step expectation for the latest point
+  surprise: number // |actual - predicted| / netRmse  (sigmas of model error)
 }
 
 export interface ForecastOpts {
@@ -172,6 +177,8 @@ const EMPTY: SeriesForecast = {
   naiveRmse: 0,
   skill: 0,
   trained: false,
+  predictedLast: 0,
+  surprise: 0,
 }
 
 /**
@@ -199,12 +206,15 @@ export function forecastSeries(
   const range = max - min
   if (range === 0) {
     // flat series — perfect persistence, nothing to learn
+    const v = series[series.length - 1]
     return {
-      predictions: new Array(horizon).fill(series[series.length - 1]),
+      predictions: new Array(horizon).fill(v),
       netRmse: 0,
       naiveRmse: 0,
       skill: 0,
       trained: true,
+      predictedLast: v,
+      surprise: 0,
     }
   }
   const norm = series.map((v) => ((v - min) / range) * (hi - lo) + lo)
@@ -229,20 +239,28 @@ export function forecastSeries(
     }
   }
 
-  // open-loop score on the held-out tail
+  // open-loop score on the held-out tail (out-of-sample). Capture the very
+  // last point's prediction too — that's the model's expectation for "now".
   let netSq = 0
   let naiveSq = 0
   let count = 0
+  let predictedLast = series[series.length - 1]
   for (let t = trainUpb; t < norm.length; t++) {
     const p = denorm(net.forward(norm.slice(t - window, t))[0])
     const a = series[t]
     netSq += (p - a) ** 2
     naiveSq += (series[t - 1] - a) ** 2 // persistence
     count++
+    if (t === norm.length - 1) predictedLast = p
   }
   const netRmse = Math.sqrt(netSq / count)
   const naiveRmse = Math.sqrt(naiveSq / count)
   const skill = naiveRmse > 1e-9 ? 1 - netRmse / naiveRmse : 0
+  predictedLast = Math.round(predictedLast * 10) / 10
+  const surprise =
+    netRmse > 1e-9
+      ? Math.abs(series[series.length - 1] - predictedLast) / netRmse
+      : 0
 
   // closed-loop forecast of the next `horizon` steps
   const buf = norm.slice(norm.length - window)
@@ -254,5 +272,13 @@ export function forecastSeries(
     buf.push(y)
   }
 
-  return { predictions, netRmse, naiveRmse, skill, trained: true }
+  return {
+    predictions,
+    netRmse,
+    naiveRmse,
+    skill,
+    trained: true,
+    predictedLast,
+    surprise: Math.round(surprise * 10) / 10,
+  }
 }

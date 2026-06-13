@@ -121,6 +121,19 @@ export default function TrendsModal({
   }, [open, snaps.length])
   const anyForecast = Object.values(forecasts).some((f) => f.trained)
 
+  // Forecast surprises: metrics where the latest reading diverges sharply from
+  // a *skilful* model's expectation — the learned pattern broke. Complements
+  // the z-score anomalies (a value can fit its range yet defy its own cycle).
+  const surprises = METRICS.map((m) => ({ m, fc: forecasts[m.key] })).filter(
+    ({ m, fc }) =>
+      !!fc?.trained &&
+      fc.skill > 0.05 &&
+      fc.surprise >= 2.5 &&
+      !anomalies.some((a) => a.key === m.key),
+  )
+  const currentOf = (key: string) =>
+    snaps.length ? snaps[snaps.length - 1].m[key] ?? 0 : 0
+
   if (!open) return null
   const last = snaps.length - 1
   const idx = scrub == null ? last : Math.min(scrub, last)
@@ -213,6 +226,23 @@ export default function TrendsModal({
                 <Markdown text={assess.text} />
               </div>
             )}
+          </div>
+        )}
+
+        {surprises.length > 0 && (
+          <div className="surprise-panel">
+            <div className="surprise-title">
+              ◇ FORECAST SURPRISE · {surprises.length} off-pattern
+            </div>
+            {surprises.map(({ m, fc }) => (
+              <div className="surprise-row" key={m.key}>
+                <span className="surprise-label">{m.label}</span>
+                <span className="surprise-stat">
+                  now <b>{currentOf(m.key)}</b> · model expected {fc!.predictedLast}
+                  <em>{fc!.surprise}σ off</em>
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

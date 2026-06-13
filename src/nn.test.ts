@@ -65,4 +65,19 @@ describe('forecastSeries', () => {
     // next value should continue above the last observed (~49)
     expect(f.predictions[0]).toBeGreaterThan(45)
   })
+
+  it('flags a large forecast surprise when the pattern breaks', () => {
+    // a clean cycle the net learns well, then a wildly off-pattern last point
+    const series = Array.from({ length: 90 }, (_, i) => 50 + 30 * Math.sin(i / 3))
+    series[series.length - 1] = 250 // shock the latest reading
+    const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 4 })
+    expect(f.trained).toBe(true)
+    expect(f.surprise).toBeGreaterThan(3) // many sigmas of model error
+  })
+
+  it('reports a small surprise when the latest point fits the pattern', () => {
+    const series = Array.from({ length: 90 }, (_, i) => 50 + 30 * Math.sin(i / 3))
+    const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 5 })
+    expect(f.surprise).toBeLessThan(3)
+  })
 })
