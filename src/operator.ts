@@ -190,11 +190,14 @@ export interface Forecast {
 
 const ASSESS_SYSTEM = `You are VANTAGE's early-warning analyst. You are handed a
 list of metrics that just spiked abnormally above their baseline, plus the live
-global situation. For each spike, state in one tight sentence the most likely
-driver and the probable near-term development to watch for. Lead with the most
-consequential. Be concrete and grounded in the data; if a spike looks like
+global situation. Some spikes include a NEURAL FORECAST (a small net trained on
+the metric's own history projecting the next few values) — when present, use it
+to judge whether the spike is still building or already easing, and factor in
+how much it beats a naive baseline. For each spike, state in one tight sentence
+the most likely driver and the probable near-term development to watch for. Lead
+with the most consequential. Be concrete and grounded; if a spike looks like
 benign noise or a data artefact, say so. End with a one-line BOTTOM LINE. Use
-short markdown bullets. Keep the whole thing under ~120 words.`
+short markdown bullets. Keep the whole thing under ~130 words.`
 
 const OUTLOOK_SYSTEM = `You are VANTAGE's forecasting desk. From the live global
 situation, give a concise forward look: the 3-5 most probable developments over

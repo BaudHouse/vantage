@@ -71,12 +71,18 @@ export default function TrendsModal({
       setAssess({ err: 'Local model not ready (Ollama).' })
       return
     }
-    const spikes = anoms.map(
-      (a) =>
-        `${a.label}: ${a.current} vs baseline ${a.mean} (${
-          a.z >= 99 ? 'spike' : `${a.z}σ`
-        }, +${a.pct}%)`,
-    )
+    const spikes = anoms.map((a) => {
+      const fc = forecasts[a.key]
+      const proj =
+        fc?.trained && fc.skill > 0.02
+          ? ` | neural forecast next: ${fc.predictions.join(', ')} (beats naive by ${Math.round(
+              fc.skill * 100,
+            )}%)`
+          : ''
+      return `${a.label}: ${a.current} vs baseline ${a.mean} (${
+        a.z >= 99 ? 'spike' : `${a.z}σ`
+      }, +${a.pct}%)${proj}`
+    })
     const text = await assessSituations(model, spikes, getContext())
     setAssess(text ? { text } : { err: 'Operator unreachable.' })
   }
