@@ -565,6 +565,25 @@
   font-size: 10px;
   letter-spacing: 0.3px;
 }
+.ew-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ew-actions .ew-assess { margin-top: 0; flex: 1; }
+.ew-cascade {
+  flex: none;
+  background: rgba(192, 139, 255, 0.12);
+  border: 1px solid rgba(192, 139, 255, 0.45);
+  color: #d9c4ff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ew-cascade:hover { background: rgba(192, 139, 255, 0.2); }
 .ew-assess {
   width: 100%;
   margin-top: 10px;

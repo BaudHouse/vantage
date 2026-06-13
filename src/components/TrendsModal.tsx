@@ -13,6 +13,7 @@ interface Props {
   // localStorage parsing or anomaly scanning of its own.
   snaps: Snapshot[]
   anomalies: Anomaly[]
+  onCascade: (seed: string) => void
 }
 
 function Spark({
@@ -51,6 +52,7 @@ export default function TrendsModal({
   getContext,
   snaps,
   anomalies,
+  onCascade,
 }: Props) {
   const [scrub, setScrub] = useState<number | null>(null)
   const [assess, setAssess] = useState<{
@@ -139,17 +141,32 @@ export default function TrendsModal({
                 </span>
               </div>
             ))}
-            <button
-              className="ew-assess"
-              onClick={() => runAssess(anomalies)}
-              disabled={assess?.busy}
-            >
-              {assess?.busy
-                ? '◍ assessing…'
-                : assess?.text
-                  ? '↻ re-assess developing situations'
-                  : '🔮 Assess developing situations with Operator'}
-            </button>
+            <div className="ew-actions">
+              <button
+                className="ew-assess"
+                onClick={() => runAssess(anomalies)}
+                disabled={assess?.busy}
+              >
+                {assess?.busy
+                  ? '◍ assessing…'
+                  : assess?.text
+                    ? '↻ re-assess'
+                    : '🔮 Assess situations'}
+              </button>
+              <button
+                className="ew-cascade"
+                onClick={() =>
+                  onCascade(
+                    `${anomalies[0].label} spiking to ${anomalies[0].current} (${
+                      anomalies[0].z >= 99 ? 'sharp spike' : `${anomalies[0].z}σ`
+                    } above baseline ${anomalies[0].mean})`,
+                  )
+                }
+                title="Map the butterfly-effect cascade from the top developing situation"
+              >
+                🦋 Trace cascade
+              </button>
+            </div>
             {assess?.err && <div className="ew-err">⚠ {assess.err}</div>}
             {assess?.text && (
               <div className="ew-assessment">

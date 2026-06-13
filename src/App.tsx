@@ -944,6 +944,10 @@ export default function App() {
         getContext={getContext}
         snaps={snaps}
         anomalies={anomalies}
+        onCascade={(seed) => {
+          setTrendsOpen(false)
+          openButterfly(seed)
+        }}
       />
       <ButterflyModal
         open={butterfly.open}
