@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TREND_METRICS as METRICS, type Snapshot } from '../trends'
 import type { Anomaly } from '../anomaly'
+import { forecastSeries, type SeriesForecast } from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
 import Markdown from './Markdown'
 
@@ -92,6 +93,28 @@ export default function TrendsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, anomalies])
 
+  // Train the ported sunspot net on each metric's history and forecast the
+  // next few steps (only when there's enough history to learn + score).
+  const forecasts = useMemo(() => {
+    const m: Record<string, SeriesForecast> = {}
+    if (!open || snaps.length < 14) return m
+    METRICS.forEach((met, i) => {
+      const s = snaps.map((x) => x.m[met.key] ?? 0)
+      m[met.key] = forecastSeries(s, {
+        window: 6,
+        hidden: 8,
+        horizon: 3,
+        epochs: 250,
+        seed: i + 1,
+      })
+    })
+    return m
+    // snaps identity changes each refresh; key on length so we don't retrain
+    // on every poll while the panel sits open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, snaps.length])
+  const anyForecast = Object.values(forecasts).some((f) => f.trained)
+
   if (!open) return null
   const last = snaps.length - 1
   const idx = scrub == null ? last : Math.min(scrub, last)
@@ -123,6 +146,7 @@ export default function TrendsModal({
           {snaps.length} snapshots · spanning{' '}
           {span >= 60 ? `${(span / 60).toFixed(1)} h` : `${span} min`} · auto-logged
           each refresh
+          {anyForecast && ' · 🧠 neural forecast trained on this history'}
         </p>
 
         {anomalies.length > 0 && (
@@ -208,6 +232,7 @@ export default function TrendsModal({
                 const delta = now - series[0]
                 const peak = Math.max(...series)
                 if (peak === 0) return null
+                const fc = forecasts[m.key]
                 return (
                   <div className="trend-row" key={m.key}>
                     <div className="trend-meta">
@@ -218,6 +243,26 @@ export default function TrendsModal({
                           {delta > 0 ? `▲${delta}` : delta < 0 ? `▼${-delta}` : '—'}
                         </em>
                       </span>
+                      {fc?.trained && (
+                        <span className="trend-nn">
+                          🧠 next {fc.predictions.join(' · ')}
+                          <em
+                            className={
+                              fc.skill > 0.02
+                                ? 'good'
+                                : fc.skill < -0.02
+                                  ? 'bad'
+                                  : ''
+                            }
+                          >
+                            {fc.skill > 0.02
+                              ? `+${Math.round(fc.skill * 100)}% vs naive`
+                              : fc.skill < -0.02
+                                ? `${Math.round(fc.skill * 100)}% vs naive`
+                                : 'flat'}
+                          </em>
+                        </span>
+                      )}
                     </div>
                     <Spark values={series} color={m.color} markerIdx={idx} />
                     <span className="trend-peak">pk {peak}</span>

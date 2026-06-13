@@ -716,6 +716,22 @@
   color: #66718a;
   white-space: nowrap;
 }
+.trend-nn {
+  font-size: 10.5px;
+  color: #8da0ba;
+  font-variant-numeric: tabular-nums;
+}
+.trend-nn em {
+  font-style: normal;
+  margin-left: 6px;
+  color: #66718a;
+}
+.trend-nn em.good {
+  color: #3ddc97;
+}
+.trend-nn em.bad {
+  color: #ff8a96;
+}
 
 /* ---------- globe-click area sitrep ---------- */
 .area-scan {
