@@ -115,10 +115,11 @@ export default function TrendsModal({
       })
     })
     return m
-    // snaps identity changes each refresh; key on length so we don't retrain
-    // on every poll while the panel sits open.
+    // Key on the LATEST snapshot's timestamp: retrains when genuinely new data
+    // lands (not on scrub re-renders), and — unlike snaps.length — keeps working
+    // after the 400-cap ring buffer stops growing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, snaps.length])
+  }, [open, snaps.length ? snaps[snaps.length - 1].t : 0])
   const anyForecast = Object.values(forecasts).some((f) => f.trained)
 
   // Forecast surprises: metrics where the latest reading diverges sharply from

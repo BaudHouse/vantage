@@ -26,6 +26,19 @@ export function mightHaveCams(text: string): boolean {
   return CAM_AREA_HINTS.test(text)
 }
 
+// Whole-word containment (so "west" doesn't match inside "midwest").
+function wordIn(haystack: string, needle: string): boolean {
+  let from = 0
+  for (;;) {
+    const i = haystack.indexOf(needle, from)
+    if (i < 0) return false
+    const before = i === 0 ? ' ' : haystack[i - 1]
+    const after = haystack[i + needle.length] ?? ' '
+    if (!/[a-z]/.test(before) && !/[a-z]/.test(after)) return true
+    from = i + 1
+  }
+}
+
 /**
  * Cameras whose region/name/road words appear in the question text — covers
  * the cities our cameras actually live in (which a conflict gazetteer won't
@@ -46,7 +59,7 @@ export function camsMatchingText(
           .filter((w) => w.length >= 4),
       )
       let score = 0
-      for (const tok of toks) if (q.includes(tok)) score++
+      for (const tok of toks) if (wordIn(q, tok)) score++
       return { c, score }
     })
     .filter((x) => x.score > 0)

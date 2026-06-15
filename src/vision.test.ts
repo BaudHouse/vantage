@@ -93,6 +93,17 @@ describe('camsMatchingText', () => {
   it('returns nothing when no area words match', () => {
     expect(camsMatchingText('assess the global situation', cams)).toEqual([])
   })
+
+  it('matches whole words only (no substring false positives)', () => {
+    const c2 = [cam('w', 40, -74, 'West Side Highway', 'West gantry')]
+    // "midwest" / "westchester" contain "west" but must NOT match
+    expect(camsMatchingText('any news from the midwest corridor', c2)).toEqual(
+      [],
+    )
+    expect(camsMatchingText('traffic on the west side', c2).map((c) => c.id)).toEqual(
+      ['w'],
+    )
+  })
 })
 
 describe('mightHaveCams', () => {
