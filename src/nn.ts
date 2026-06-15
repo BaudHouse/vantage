@@ -171,6 +171,106 @@ export interface ForecastOpts {
   seed?: number
 }
 
+export interface MultiForecast {
+  prediction: number // next value of the target signal (raw scale)
+  netRmse: number // multivariate model RMSE on a held-out tail
+  naiveRmse: number // persistence baseline RMSE on the same tail
+  skill: number // 1 - net/naive (>0 = the cross-signal model adds value)
+  trained: boolean
+  features: number // # of input signals the model learned from
+}
+
+const EMPTY_MULTI: MultiForecast = {
+  prediction: 0,
+  netRmse: 0,
+  naiveRmse: 0,
+  skill: 0,
+  trained: false,
+  features: 0,
+}
+
+/**
+ * MULTIVARIATE forecast: train a net to predict the next value of one target
+ * signal from a window of ALL signals (so it can learn cross-signal leading
+ * relationships — e.g. an aircraft/seismic surge preceding conflict). Scored
+ * honestly against naive persistence of the target on a held-out tail.
+ *
+ * matrix: rows = time steps, cols = signals; targetIdx = column to forecast.
+ */
+export function forecastMultivariate(
+  matrix: number[][],
+  targetIdx: number,
+  opts: ForecastOpts = {},
+): MultiForecast {
+  const window = opts.window ?? 4
+  const hidden = opts.hidden ?? 12
+  const epochs = opts.epochs ?? 300
+  const T = matrix.length
+  const F = matrix[0]?.length ?? 0
+  if (F === 0 || targetIdx < 0 || targetIdx >= F) return EMPTY_MULTI
+  if (T < window + 8) return { ...EMPTY_MULTI, features: F }
+
+  const lo = 0.1
+  const hi = 0.9
+  const mins = new Array(F).fill(Infinity)
+  const maxs = new Array(F).fill(-Infinity)
+  for (const row of matrix) {
+    for (let f = 0; f < F; f++) {
+      if (row[f] < mins[f]) mins[f] = row[f]
+      if (row[f] > maxs[f]) maxs[f] = row[f]
+    }
+  }
+  const norm = (v: number, f: number) => {
+    const r = maxs[f] - mins[f]
+    return r > 0 ? ((v - mins[f]) / r) * (hi - lo) + lo : 0.5
+  }
+  const rangeT = maxs[targetIdx] - mins[targetIdx]
+  const denormT = (n: number) =>
+    rangeT > 0 ? ((n - lo) / (hi - lo)) * rangeT + mins[targetIdx] : mins[targetIdx]
+
+  // input at time t = flattened, per-feature-normalized window [t-window, t)
+  const inputAt = (t: number): number[] => {
+    const a: number[] = []
+    for (let k = t - window; k < t; k++)
+      for (let f = 0; f < F; f++) a.push(norm(matrix[k][f], f))
+    return a
+  }
+
+  const samples = T - window
+  const testN = Math.max(3, Math.round(samples * 0.2))
+  const trainUpb = T - testN
+
+  const net = new Net([window * F, hidden, 1], {
+    eta: 0.1,
+    alpha: 0.5,
+    hiddenAct: 'tanh',
+    outputAct: 'sigmoid',
+    seed: opts.seed,
+  })
+  for (let e = 0; e < epochs; e++) {
+    for (let t = window; t < trainUpb; t++) {
+      net.train(inputAt(t), [norm(matrix[t][targetIdx], targetIdx)])
+    }
+  }
+
+  let netSq = 0
+  let naiveSq = 0
+  let count = 0
+  for (let t = trainUpb; t < T; t++) {
+    const p = denormT(net.forward(inputAt(t))[0])
+    const a = matrix[t][targetIdx]
+    netSq += (p - a) ** 2
+    naiveSq += (matrix[t - 1][targetIdx] - a) ** 2
+    count++
+  }
+  const netRmse = Math.sqrt(netSq / count)
+  const naiveRmse = Math.sqrt(naiveSq / count)
+  const skill = naiveRmse > 1e-9 ? 1 - netRmse / naiveRmse : 0
+  const prediction = Math.round(denormT(net.forward(inputAt(T))[0]) * 10) / 10
+
+  return { prediction, netRmse, naiveRmse, skill, trained: true, features: F }
+}
+
 const EMPTY: SeriesForecast = {
   predictions: [],
   netRmse: 0,

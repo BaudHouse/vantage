@@ -551,6 +551,55 @@
   font-size: 12px;
   margin: 6px 0 14px;
 }
+.model-card {
+  margin-bottom: 14px;
+  border: 1px solid rgba(95, 208, 224, 0.4);
+  background: linear-gradient(180deg, rgba(95, 208, 224, 0.09), rgba(95, 208, 224, 0.03));
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+.mc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  color: #5fd0e0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+.mc-sub {
+  color: #66718a;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.mc-body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.mc-pred {
+  color: #cdd9e5;
+  font-size: 13px;
+}
+.mc-pred b {
+  color: #fff;
+  font-size: 16px;
+}
+.mc-skill {
+  font-size: 11px;
+  color: #8da0ba;
+}
+.mc-skill.good {
+  color: #3ddc97;
+}
+.mc-skill.bad {
+  color: #ff8a96;
+}
+
 .ew-panel {
   margin-bottom: 14px;
   border: 1px solid rgba(255, 77, 77, 0.45);

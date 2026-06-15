@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TREND_METRICS as METRICS, type Snapshot } from '../trends'
 import type { Anomaly } from '../anomaly'
-import { forecastSeries, type SeriesForecast } from '../nn'
+import {
+  forecastSeries,
+  forecastMultivariate,
+  type SeriesForecast,
+} from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
 import Markdown from './Markdown'
 
@@ -122,6 +126,23 @@ export default function TrendsModal({
   }, [open, snaps.length ? snaps[snaps.length - 1].t : 0])
   const anyForecast = Object.values(forecasts).some((f) => f.trained)
 
+  // Multivariate "all-signal" model: predict conflict zones from a window of
+  // EVERY signal, so it can pick up cross-signal leading relationships.
+  const multi = useMemo(() => {
+    if (!open || snaps.length < 14) return null
+    const keys = METRICS.map((m) => m.key)
+    const matrix = snaps.map((s) => keys.map((k) => s.m[k] ?? 0))
+    const targetIdx = keys.indexOf('active')
+    if (targetIdx < 0) return null
+    return forecastMultivariate(matrix, targetIdx, {
+      window: 4,
+      hidden: 12,
+      epochs: 300,
+      seed: 99,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, snaps.length ? snaps[snaps.length - 1].t : 0])
+
   // Forecast surprises: metrics where the latest reading diverges sharply from
   // a *skilful* model's expectation — the learned pattern broke. Complements
   // the z-score anomalies (a value can fit its range yet defy its own cycle).
@@ -168,6 +189,33 @@ export default function TrendsModal({
           each refresh
           {anyForecast && ' · 🧠 neural forecast trained on this history'}
         </p>
+
+        {multi?.trained && (
+          <div className="model-card">
+            <div className="mc-head">
+              🧠 ALL-SIGNAL MODEL
+              <span className="mc-sub">
+                trained on {multi.features} signals × {snaps.length} steps
+              </span>
+            </div>
+            <div className="mc-body">
+              <span className="mc-pred">
+                conflict zones next: <b>{multi.prediction}</b>
+              </span>
+              <span
+                className={`mc-skill ${
+                  multi.skill > 0.02 ? 'good' : multi.skill < -0.02 ? 'bad' : ''
+                }`}
+              >
+                {multi.skill > 0.02
+                  ? `+${Math.round(multi.skill * 100)}% vs naive — cross-signal structure learned`
+                  : multi.skill < -0.02
+                    ? `${Math.round(multi.skill * 100)}% vs naive — no extra signal yet`
+                    : 'on par with naive so far'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {anomalies.length > 0 && (
           <div className="ew-panel">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Net, forecastSeries } from './nn'
+import { Net, forecastSeries, forecastMultivariate } from './nn'
 
 describe('Net (backprop core)', () => {
   it('learns XOR (non-linear, needs a hidden layer)', () => {
@@ -79,5 +79,39 @@ describe('forecastSeries', () => {
     const series = Array.from({ length: 90 }, (_, i) => 50 + 30 * Math.sin(i / 3))
     const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 5 })
     expect(f.surprise).toBeLessThan(3)
+  })
+})
+
+describe('forecastMultivariate', () => {
+  it('returns trained=false on too-short / bad input', () => {
+    expect(forecastMultivariate([[1], [2], [3]], 0).trained).toBe(false)
+    expect(forecastMultivariate([], 0).trained).toBe(false)
+    expect(forecastMultivariate([[1, 2]], 5).trained).toBe(false)
+  })
+
+  it('learns a CROSS-signal lead relationship a univariate model would miss', () => {
+    // signal 0 is a leading driver; the target (signal 1) follows it by 1 step
+    // with its OWN value being near-random noise — so naive persistence of the
+    // target is useless, but a model that reads signal 0 can predict it.
+    const driver: number[] = []
+    const target: number[] = []
+    let s = 7
+    for (let i = 0; i < 120; i++) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff // deterministic pseudo-noise
+      driver.push(50 + 40 * Math.sin(i / 5))
+      // target[i] depends on driver[i-1], not on target[i-1]
+      target.push(i === 0 ? 50 : driver[i - 1] * 0.8 + 10)
+    }
+    const matrix = driver.map((d, i) => [d, target[i]])
+    const f = forecastMultivariate(matrix, 1, {
+      window: 3,
+      hidden: 12,
+      epochs: 400,
+      seed: 1,
+    })
+    expect(f.trained).toBe(true)
+    expect(f.features).toBe(2)
+    // the cross-signal model should beat naive persistence of the target
+    expect(f.skill).toBeGreaterThan(0.2)
   })
 })
