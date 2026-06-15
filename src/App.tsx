@@ -436,6 +436,23 @@ export default function App() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>(() =>
     detectAnomalies(snaps, TREND_METRICS),
   )
+  // Grounds the butterfly cascade in what's actually developing right now (the
+  // detected abnormal spikes) so it reasons from real leading indicators.
+  const cascadeGrounding = useMemo(() => {
+    if (!anomalies.length) return ''
+    return (
+      'DEVELOPING NOW (statistically abnormal spikes detected this cycle): ' +
+      anomalies
+        .slice(0, 6)
+        .map(
+          (a) =>
+            `${a.label} ${a.current} (${
+              a.z >= 99 ? 'sharp spike' : `${a.z}σ`
+            }, +${a.pct}% over baseline ${a.mean})`,
+        )
+        .join('; ')
+    )
+  }, [anomalies])
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
   const addWatch = (name: string) => {
@@ -955,6 +972,7 @@ export default function App() {
         seed={butterfly.seed}
         onClose={() => setButterfly((s) => ({ ...s, open: false }))}
         getContext={getContext}
+        grounding={cascadeGrounding}
       />
       <WatchlistModal
         open={watchOpen}

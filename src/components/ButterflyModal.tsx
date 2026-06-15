@@ -13,6 +13,7 @@ interface Props {
   seed: string
   onClose: () => void
   getContext: () => string
+  grounding?: string // live developing-situations context to anchor the cascade
 }
 
 const DOMAIN_COLOR: Record<CascadeDomain, string> = {
@@ -37,6 +38,7 @@ export default function ButterflyModal({
   seed,
   onClose,
   getContext,
+  grounding,
 }: Props) {
   const [trigger, setTrigger] = useState(seed)
   const [busy, setBusy] = useState(false)
@@ -69,7 +71,8 @@ export default function ButterflyModal({
     }
     // Ensemble: several independent drafts reconciled into a calibrated
     // consensus — slower, but the most accurate cascade we can produce locally.
-    const c = await traceCascadeEnsemble(model, t, getContext(), {
+    const ctx = grounding ? `${getContext()}\n\n${grounding}` : getContext()
+    const c = await traceCascadeEnsemble(model, t, ctx, {
       samples: 3,
       onProgress: setStatus,
     })
