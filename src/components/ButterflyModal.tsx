@@ -5,7 +5,7 @@ import {
   type Cascade,
   type CascadeDomain,
 } from '../cascade'
-import { ollamaModel } from '../operator'
+import { ollamaModel, chatModels } from '../operator'
 import Markdown from './Markdown'
 
 interface Props {
@@ -72,8 +72,10 @@ export default function ButterflyModal({
     // Ensemble: several independent drafts reconciled into a calibrated
     // consensus — slower, but the most accurate cascade we can produce locally.
     const ctx = grounding ? `${getContext()}\n\n${grounding}` : getContext()
+    // Use all installed chat models so the drafts are architecturally diverse.
+    const pool = await chatModels()
     const c = await traceCascadeEnsemble(model, t, ctx, {
-      samples: 3,
+      models: pool,
       onProgress: setStatus,
     })
     setStatus('')

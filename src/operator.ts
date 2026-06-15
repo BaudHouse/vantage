@@ -92,6 +92,34 @@ const VISION_MODELS = [
   'minicpm-v', 'bakllava', 'moondream',
 ]
 
+/**
+ * Installed GENERAL chat models (excludes vision + embedding models), strongest
+ * first. Used to draft the cascade ensemble across architecturally-different
+ * models so the drafts are genuinely independent, not just temperature-varied.
+ */
+export async function chatModels(): Promise<string[]> {
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
+    if (!r || !r.ok) return []
+    const j = await r.json()
+    const names: string[] = (j?.models ?? [])
+      .map((m: any) => m.name as string)
+      .filter(
+        (n: string) =>
+          !/embed|nomic|vl|vision|llava|minicpm|bakllava|moondream/i.test(n),
+      )
+    const ordered: string[] = []
+    for (const p of PREFERRED) {
+      const hit = names.find((n) => n === p || n.startsWith(p))
+      if (hit && !ordered.includes(hit)) ordered.push(hit)
+    }
+    for (const n of names) if (!ordered.includes(n)) ordered.push(n)
+    return ordered
+  } catch {
+    return []
+  }
+}
+
 /** Find an installed embedding model (e.g. nomic-embed-text), or null. */
 export async function embedModel(): Promise<string | null> {
   try {

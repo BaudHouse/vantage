@@ -192,6 +192,7 @@ Reply with ONLY the same JSON schema:
 export interface EnsembleOpts {
   samples?: number
   onProgress?: (msg: string) => void
+  models?: string[] // draft pool; >1 = genuinely-independent multi-model drafts
 }
 
 /**
@@ -206,14 +207,22 @@ export async function traceCascadeEnsemble(
   context: string,
   opts: EnsembleOpts = {},
 ): Promise<Cascade> {
-  const K = Math.max(1, Math.min(5, opts.samples ?? 3))
   const prog = opts.onProgress ?? (() => {})
+  // Draft pool: distinct chat models if supplied (genuinely independent drafts),
+  // else the single primary model with temperature variation.
+  const pool =
+    opts.models && opts.models.length > 1 ? opts.models : [model]
+  const multi = pool.length > 1
+  const K = Math.max(1, Math.min(6, opts.samples ?? (multi ? 4 : 3)))
 
   const drafts: Cascade[] = []
   for (let i = 0; i < K; i++) {
-    prog(`drafting scenario ${i + 1} of ${K}…`)
-    // vary temperature a touch per draft for genuine diversity
-    const c = await traceCascade(model, trigger, context, 0.65 + i * 0.1)
+    const m = pool[i % pool.length]
+    prog(
+      `drafting scenario ${i + 1} of ${K}${multi ? ` · ${m}` : ''}…`,
+    )
+    // vary temperature a touch per draft for extra diversity
+    const c = await traceCascade(m, trigger, context, 0.65 + (i % 3) * 0.1)
     if (c.chains.length) drafts.push(c)
   }
   if (!drafts.length) return { chains: [], bottomLine: '', samples: 0 }
