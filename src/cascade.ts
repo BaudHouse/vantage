@@ -162,9 +162,10 @@ Rules:
 Reply with ONLY JSON, no prose:
 {"chains":[{"agreement":N,"steps":[{"domain":"...","effect":"...","likelihood":NN,"horizon":"..."}]}],"bottom_line":"..."}`
 
-function draftToJson(c: Cascade): string {
+function draftToJson(c: Cascade, withAgreement = false): string {
   return JSON.stringify({
     chains: c.chains.map((ch) => ({
+      ...(withAgreement && ch.agreement ? { agreement: ch.agreement } : {}),
       steps: ch.steps.map((s) => ({
         domain: s.domain,
         effect: s.effect,
@@ -172,8 +173,20 @@ function draftToJson(c: Cascade): string {
         horizon: s.horizon,
       })),
     })),
+    ...(c.bottomLine ? { bottom_line: c.bottomLine } : {}),
   })
 }
+
+const CRITIQUE_SYSTEM = `You are VANTAGE's red-team calibrator. You are handed a
+reconciled cascade forecast. STRESS-TEST its probabilities and fix
+over-confidence — the most common forecasting error. For each step: consider the
+dampeners and blockers that could stop it, and LOWER the likelihood if the
+consensus looks over-confident for that base rate; only raise one if it is
+clearly too low; let certainty decay with depth. Keep the chain structure,
+effects, horizons and "agreement" values unchanged — revise ONLY the
+likelihoods, and drop a chain only if it is implausible on reflection.
+Reply with ONLY the same JSON schema:
+{"chains":[{"agreement":N,"steps":[{"domain":"...","effect":"...","likelihood":NN,"horizon":"..."}]}],"bottom_line":"..."}`
 
 export interface EnsembleOpts {
   samples?: number
@@ -222,5 +235,24 @@ export async function traceCascadeEnsemble(
   )
   const merged = text ? parseCascade(text) : { chains: [], bottomLine: '' }
   if (!merged.chains.length) return { ...drafts[0], samples: drafts.length }
-  return { ...merged, samples: drafts.length }
+
+  // Final calibration: red-team the consensus likelihoods for over-confidence.
+  prog('stress-testing likelihoods…')
+  const critText = await chat(
+    model,
+    [
+      { role: 'system', content: CRITIQUE_SYSTEM },
+      {
+        role: 'user',
+        content: `TRIGGER: ${trigger}\n\nRECONCILED CASCADE:\n${draftToJson(
+          merged,
+          true,
+        )}\n\nReturn the calibrated JSON:`,
+      },
+    ],
+    { temperature: 0.2 },
+  )
+  const calibrated = critText ? parseCascade(critText) : { chains: [], bottomLine: '' }
+  const final = calibrated.chains.length ? calibrated : merged
+  return { ...final, samples: drafts.length }
 }
