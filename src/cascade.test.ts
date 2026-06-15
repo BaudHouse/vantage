@@ -84,4 +84,18 @@ describe('parseCascade', () => {
     }))
     expect(parseCascade(JSON.stringify({ chains })).chains).toHaveLength(5)
   })
+
+  it('reads a per-chain agreement count when present', () => {
+    const c = parseCascade(
+      '{"chains":[{"agreement":3,"steps":[{"domain":"MIL","effect":"a credible downstream effect","likelihood":60}]}]}',
+    )
+    expect(c.chains[0].agreement).toBe(3)
+  })
+
+  it('leaves agreement undefined when absent or invalid', () => {
+    const c = parseCascade(
+      '{"chains":[{"agreement":"x","steps":[{"domain":"ECON","effect":"a credible downstream effect","likelihood":40}]}]}',
+    )
+    expect(c.chains[0].agreement).toBeUndefined()
+  })
 })

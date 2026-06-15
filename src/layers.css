@@ -377,6 +377,37 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.bf-status {
+  color: #c08bff;
+  font-size: 12px;
+  padding: 6px 2px;
+}
+.bf-consensus {
+  margin-left: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #b89bff;
+  border: 1px solid rgba(192, 139, 255, 0.4);
+  border-radius: 12px;
+  padding: 2px 8px;
+  vertical-align: middle;
+}
+.bf-tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.bf-agree {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9aa8bd;
+  border: 1px solid var(--line2, #28344a);
+  border-radius: 12px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
 .bf-hint,
 .bf-err {
   font-size: 12px;

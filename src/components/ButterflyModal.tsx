@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  traceCascade,
+  traceCascadeEnsemble,
   chainProbability,
   type Cascade,
   type CascadeDomain,
@@ -40,6 +40,7 @@ export default function ButterflyModal({
 }: Props) {
   const [trigger, setTrigger] = useState(seed)
   const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('')
   const [result, setResult] = useState<Cascade | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -58,14 +59,23 @@ export default function ButterflyModal({
     setBusy(true)
     setErr(null)
     setResult(null)
+    setStatus('finding vision model…')
     const model = await ollamaModel()
     if (!model) {
       setErr('Local model not ready (Ollama).')
       setBusy(false)
+      setStatus('')
       return
     }
-    const c = await traceCascade(model, t, getContext())
-    if (!c.chains.length) setErr('No cascade returned — try rephrasing the trigger.')
+    // Ensemble: several independent drafts reconciled into a calibrated
+    // consensus — slower, but the most accurate cascade we can produce locally.
+    const c = await traceCascadeEnsemble(model, t, getContext(), {
+      samples: 3,
+      onProgress: setStatus,
+    })
+    setStatus('')
+    if (!c.chains.length)
+      setErr('No cascade returned — try rephrasing the trigger.')
     else setResult(c)
     setBusy(false)
   }
@@ -103,11 +113,19 @@ export default function ButterflyModal({
           </button>
         </div>
 
+        {busy && status && <div className="bf-status">◍ {status}</div>}
         {err && <div className="bf-err">⚠ {err}</div>}
 
         {result && (
           <div className="bf-out">
-            <div className="bf-trigger">⚡ {trigger.trim()}</div>
+            <div className="bf-trigger">
+              ⚡ {trigger.trim()}
+              {result.samples && result.samples > 1 && (
+                <span className="bf-consensus">
+                  consensus of {result.samples} drafts
+                </span>
+              )}
+            </div>
             {result.chains.map((chain, ci) => {
               const p = chainProbability(chain)
               return (
@@ -134,8 +152,21 @@ export default function ButterflyModal({
                       </div>
                     </div>
                   ))}
-                  <span className={`bf-prob ${probClass(p)}`} title="Compounded probability the whole chain plays out">
-                    ∴ {p}%
+                  <span className="bf-tail">
+                    {chain.agreement && result.samples && result.samples > 1 && (
+                      <span
+                        className="bf-agree"
+                        title={`${chain.agreement} of ${result.samples} independent drafts produced this chain`}
+                      >
+                        {chain.agreement}/{result.samples} agree
+                      </span>
+                    )}
+                    <span
+                      className={`bf-prob ${probClass(p)}`}
+                      title="Compounded probability the whole chain plays out"
+                    >
+                      ∴ {p}%
+                    </span>
                   </span>
                 </div>
               )
