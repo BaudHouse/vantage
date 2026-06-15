@@ -92,6 +92,41 @@ const VISION_MODELS = [
   'minicpm-v', 'bakllava', 'moondream',
 ]
 
+/** Find an installed embedding model (e.g. nomic-embed-text), or null. */
+export async function embedModel(): Promise<string | null> {
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    const names: string[] = (j?.models ?? []).map((m: any) => m.name)
+    return names.find((n) => /embed/i.test(n)) ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Embed a batch of texts; returns one vector per input, or null on failure. */
+export async function embed(
+  model: string,
+  input: string[],
+): Promise<number[][] | null> {
+  if (!input.length) return []
+  try {
+    const r = await rawFetch(`${OLLAMA}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, input }),
+      ms: 30000,
+    })
+    if (!r || !r.ok) return null
+    const j = await r.json()
+    const e = j?.embeddings
+    return Array.isArray(e) && e.length === input.length ? e : null
+  } catch {
+    return null
+  }
+}
+
 export async function visionModel(): Promise<string | null> {
   try {
     const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })

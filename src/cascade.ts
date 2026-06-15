@@ -4,7 +4,8 @@
 // The product of a chain's likelihoods is the "butterfly" probability — small
 // trigger, certainty decaying as the chain runs out.
 
-import { chat, type ChatMsg } from './operator'
+import { chat, embed, embedModel, type ChatMsg } from './operator'
+import { anySimilar } from './embed'
 
 export type CascadeDomain =
   | 'MIL'
@@ -254,5 +255,54 @@ export async function traceCascadeEnsemble(
   )
   const calibrated = critText ? parseCascade(critText) : { chains: [], bottomLine: '' }
   const final = calibrated.chains.length ? calibrated : merged
+
+  // Measure agreement deterministically: how many independent drafts actually
+  // contain a SEMANTICALLY similar chain (embedding cosine), replacing the
+  // model's self-reported count. Best-effort — keeps the reported value if no
+  // embedding model is installed or the call fails.
+  await measureAgreement(final, drafts, prog)
+
   return { ...final, samples: drafts.length }
+}
+
+const SIM_THRESHOLD = 0.75
+
+function chainText(ch: CascadeChain): string {
+  return ch.steps.map((s) => s.effect).join('. ')
+}
+
+async function measureAgreement(
+  final: Cascade,
+  drafts: Cascade[],
+  prog: (m: string) => void,
+): Promise<void> {
+  try {
+    if (!final.chains.length) return
+    const em = await embedModel()
+    if (!em) return
+    prog('scoring agreement…')
+    const finalTexts = final.chains.map(chainText)
+    const draftChainTexts = drafts.map((d) => d.chains.map(chainText))
+    const flat = [...finalTexts]
+    const offsets: number[] = []
+    for (const dc of draftChainTexts) {
+      offsets.push(flat.length)
+      flat.push(...dc)
+    }
+    const vecs = await embed(em, flat)
+    if (!vecs || vecs.length !== flat.length) return
+    const finalVecs = vecs.slice(0, finalTexts.length)
+    final.chains.forEach((ch, ci) => {
+      let agree = 0
+      draftChainTexts.forEach((dc, di) => {
+        const pool = vecs.slice(offsets[di], offsets[di] + dc.length)
+        if (pool.length && anySimilar(finalVecs[ci], pool, SIM_THRESHOLD)) {
+          agree++
+        }
+      })
+      ch.agreement = Math.max(1, agree)
+    })
+  } catch {
+    /* keep model-reported agreement */
+  }
 }
