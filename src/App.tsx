@@ -72,6 +72,7 @@ import {
   type Snapshot,
 } from './trends'
 import { detectAnomalies, type Anomaly } from './anomaly'
+import { forecastSeries } from './nn'
 import { useNotifyOnce } from './useNotifyOnce'
 import WatchlistModal from './components/WatchlistModal'
 import {
@@ -437,21 +438,36 @@ export default function App() {
     detectAnomalies(snaps, TREND_METRICS),
   )
   // Grounds the butterfly cascade in what's actually developing right now (the
-  // detected abnormal spikes) so it reasons from real leading indicators.
+  // abnormal spikes) AND where the trained net projects each is heading, so it
+  // reasons from real leading indicators + the quantitative trajectory.
   const cascadeGrounding = useMemo(() => {
     if (!anomalies.length) return ''
+    const lines = anomalies.slice(0, 6).map((a) => {
+      const series = snaps.map((s) => s.m[a.key] ?? 0)
+      const fc = forecastSeries(series, {
+        window: 6,
+        hidden: 8,
+        horizon: 3,
+        epochs: 200,
+        seed: 1,
+      })
+      const proj =
+        fc.trained && fc.skill > 0.05
+          ? `; neural projection next ${fc.predictions.join(', ')} (beats naive ${Math.round(
+              fc.skill * 100,
+            )}%)`
+          : ''
+      return `${a.label} ${a.current} (${
+        a.z >= 99 ? 'sharp spike' : `${a.z}σ`
+      }, +${a.pct}% over baseline ${a.mean})${proj}`
+    })
     return (
-      'DEVELOPING NOW (statistically abnormal spikes detected this cycle): ' +
-      anomalies
-        .slice(0, 6)
-        .map(
-          (a) =>
-            `${a.label} ${a.current} (${
-              a.z >= 99 ? 'sharp spike' : `${a.z}σ`
-            }, +${a.pct}% over baseline ${a.mean})`,
-        )
-        .join('; ')
+      'DEVELOPING NOW (abnormal spikes + neural forward projection): ' +
+      lines.join('; ')
     )
+    // snaps is updated together with anomalies each cycle; keying on anomalies
+    // is sufficient and avoids retraining on unrelated re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anomalies])
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
