@@ -7,6 +7,7 @@ import {
   type SeriesForecast,
 } from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
+import { loadScore, scoreOf, MIN_PAIRS } from '../scorecard'
 import Markdown from './Markdown'
 
 interface Props {
@@ -156,6 +157,14 @@ export default function TrendsModal({
   const currentOf = (key: string) =>
     snaps.length ? snaps[snaps.length - 1].m[key] ?? 0 : 0
 
+  // Realized forward-forecast accuracy (scored against what actually happened).
+  const scores = (() => {
+    const store = loadScore()
+    return METRICS.map((m) => ({ m, s: scoreOf(store[m.key]?.pairs ?? []) }))
+      .filter(({ s }) => s.n >= MIN_PAIRS)
+      .sort((a, b) => b.s.n - a.s.n)
+  })()
+
   if (!open) return null
   const last = snaps.length - 1
   const idx = scrub == null ? last : Math.min(scrub, last)
@@ -213,6 +222,41 @@ export default function TrendsModal({
                     ? `${Math.round(multi.skill * 100)}% vs naive — no extra signal yet`
                     : 'on par with naive so far'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {scores.length > 0 && (
+          <div className="score-card">
+            <div className="sc-head">
+              ◎ FORECAST SCORECARD
+              <span className="sc-sub">
+                accuracy on forecasts scored against what actually happened
+              </span>
+            </div>
+            <div className="sc-rows">
+              {scores.map(({ m, s }) => (
+                <div className="sc-row" key={m.key}>
+                  <span className="sc-label">{m.label}</span>
+                  <span className="sc-stat">
+                    <em>{s.n}</em> scored ·{' '}
+                    <b
+                      className={
+                        s.skill > 0.02 ? 'good' : s.skill < -0.02 ? 'bad' : ''
+                      }
+                    >
+                      {s.skill > 0
+                        ? `+${Math.round(s.skill * 100)}%`
+                        : `${Math.round(s.skill * 100)}%`}{' '}
+                      vs naive
+                    </b>{' '}
+                    · {Math.round(s.hit * 100)}% direction
+                    {Math.abs(s.bias) >= 0.5 && (
+                      <> · bias {s.bias > 0 ? '+' : ''}{s.bias}</>
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}

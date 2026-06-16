@@ -73,6 +73,7 @@ import {
 } from './trends'
 import { detectAnomalies, type Anomaly } from './anomaly'
 import { forecastSeries } from './nn'
+import { recordCycle } from './scorecard'
 import { useNotifyOnce } from './useNotifyOnce'
 import WatchlistModal from './components/WatchlistModal'
 import {
@@ -573,6 +574,24 @@ export default function App() {
     })
     setSnaps(next)
     setAnomalies(detectAnomalies(next, TREND_METRICS))
+    // Outcome-driven learning: resolve last cycle's forecast for each metric
+    // against the value that just arrived, and stage a fresh 1-step prediction.
+    if (next.length >= 14) {
+      for (const m of TREND_METRICS) {
+        const series = next.map((s) => s.m[m.key] ?? 0)
+        const cur = series[series.length - 1]
+        recordCycle(m.key, cur, () => {
+          const f = forecastSeries(series.slice(-150), {
+            window: 6,
+            hidden: 8,
+            horizon: 1,
+            epochs: 120,
+            seed: 1,
+          })
+          return f.trained ? f.predictions[0] : cur
+        })
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updated])
 

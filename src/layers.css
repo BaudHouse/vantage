@@ -551,6 +551,70 @@
   font-size: 12px;
   margin: 6px 0 14px;
 }
+.score-card {
+  margin-bottom: 14px;
+  border: 1px solid rgba(61, 220, 151, 0.38);
+  background: rgba(61, 220, 151, 0.06);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+.sc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  color: #3ddc97;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  flex-wrap: wrap;
+}
+.sc-sub {
+  color: #66718a;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.sc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 7px;
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sc-row:first-child {
+  border-top: 0;
+}
+.sc-label {
+  color: #e8eefc;
+  font-size: 12px;
+}
+.sc-stat {
+  color: #8da0ba;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sc-stat em {
+  font-style: normal;
+  color: #cdd9e5;
+  font-weight: 700;
+}
+.sc-stat b {
+  font-weight: 700;
+}
+.sc-stat b.good {
+  color: #3ddc97;
+}
+.sc-stat b.bad {
+  color: #ff8a96;
+}
+
 .model-card {
   margin-bottom: 14px;
   border: 1px solid rgba(95, 208, 224, 0.4);
