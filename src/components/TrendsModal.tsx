@@ -157,13 +157,24 @@ export default function TrendsModal({
   const currentOf = (key: string) =>
     snaps.length ? snaps[snaps.length - 1].m[key] ?? 0 : 0
 
-  // Realized forward-forecast accuracy (scored against what actually happened).
-  const scores = (() => {
-    const store = loadScore()
-    return METRICS.map((m) => ({ m, s: scoreOf(store[m.key]?.pairs ?? []) }))
-      .filter(({ s }) => s.n >= MIN_PAIRS)
-      .sort((a, b) => b.s.n - a.s.n)
-  })()
+  // Realized forward-forecast accuracy (scored against what actually happened),
+  // and the learned per-metric bias we use to debias future forecasts.
+  const scoreStore = loadScore()
+  const scored = METRICS.map((m) => ({
+    m,
+    s: scoreOf(scoreStore[m.key]?.pairs ?? []),
+  }))
+  const biasMap: Record<string, number> = {}
+  scored.forEach(({ m, s }) => {
+    biasMap[m.key] = s.n >= MIN_PAIRS ? s.bias : 0
+  })
+  const debias = (key: string, vals: number[]) => {
+    const b = biasMap[key] || 0
+    return b ? vals.map((v) => Math.round((v - b) * 10) / 10) : vals
+  }
+  const scores = scored
+    .filter(({ s }) => s.n >= MIN_PAIRS)
+    .sort((a, b) => b.s.n - a.s.n)
 
   if (!open) return null
   const last = snaps.length - 1
@@ -270,7 +281,7 @@ export default function TrendsModal({
               const fc = forecasts[a.key]
               const proj =
                 fc?.trained && fc.predictions.length
-                  ? fc.predictions.join(' · ')
+                  ? debias(a.key, fc.predictions).join(' · ')
                   : ''
               return (
                 <div className="ew-row" key={a.key}>
@@ -384,7 +395,12 @@ export default function TrendsModal({
                       </span>
                       {fc?.trained && (
                         <span className="trend-nn">
-                          🧠 next {fc.predictions.join(' · ')}
+                          🧠 next {debias(m.key, fc.predictions).join(' · ')}
+                          {biasMap[m.key] ? (
+                            <em className="nn-cal" title="debiased from realized outcomes">
+                              ↺
+                            </em>
+                          ) : null}
                           <em
                             className={
                               fc.skill > 0.02
