@@ -12,6 +12,14 @@ import {
 } from '../predictions'
 import { sentiment, type Quote, type QuoteGroup } from '../markets'
 import { forecastMarket, ollamaModel, proposeMarkets } from '../operator'
+import {
+  loadResolutions,
+  resolve,
+  unresolve,
+  brierScore,
+  brierSkill,
+  reliability,
+} from '../calibration'
 import Markdown from './Markdown'
 
 const CAT_COLOR: Record<PredCategory, string> = {
@@ -55,6 +63,25 @@ function Predictions({ getContext }: { getContext: () => string }) {
   const [genErr, setGenErr] = useState<string | null>(null)
 
   const markets = [...generated, ...MARKETS]
+
+  const [resolved, setResolved] = useState(() => loadResolutions())
+  const resolvedById = new Map(resolved.map((r) => [r.id, r]))
+  const recordResolution = (
+    id: string,
+    question: string,
+    prob: number,
+    outcome: 0 | 1,
+  ) => {
+    resolve({ id, question, prob, outcome })
+    setResolved(loadResolutions())
+  }
+  const clearResolution = (id: string) => {
+    unresolve(id)
+    setResolved(loadResolutions())
+  }
+  const brier = brierScore(resolved)
+  const skill = brierSkill(resolved)
+  const bins = reliability(resolved)
 
   const generate = async () => {
     setGenBusy(true)
@@ -151,6 +178,49 @@ function Predictions({ getContext }: { getContext: () => string }) {
           clear {generated.length} generated ✕
         </button>
       )}
+
+      {brier != null && (
+        <div className="cal-card">
+          <div className="cal-head">
+            ◎ CALIBRATION
+            <span className="cal-sub">{resolved.length} forecasts resolved</span>
+          </div>
+          <div className="cal-stats">
+            <span>
+              Brier <b>{brier}</b>
+              <em>(0 = perfect, 0.25 = coin-flip)</em>
+            </span>
+            {skill != null && (
+              <span
+                className={`cal-skill ${
+                  skill > 0.02 ? 'good' : skill < -0.02 ? 'bad' : ''
+                }`}
+              >
+                skill {skill > 0 ? '+' : ''}
+                {Math.round(skill * 100)}% vs base rate
+              </span>
+            )}
+          </div>
+          {bins.length > 1 && (
+            <div className="cal-bins">
+              {bins.map((b) => (
+                <div className="cal-bin" key={b.lo}>
+                  <span className="cb-pred">said ~{Math.round(b.predicted)}%</span>
+                  <span className="cb-arrow">→</span>
+                  <span
+                    className={`cb-act ${
+                      Math.abs(b.actual - b.predicted) <= 12 ? 'ok' : 'off'
+                    }`}
+                  >
+                    happened {b.actual}%
+                  </span>
+                  <span className="cb-n">n={b.n}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {markets.map((m) => {
         const v = view(m, votes)
         const a = ai[m.id] ?? {}
@@ -188,6 +258,41 @@ function Predictions({ getContext }: { getContext: () => string }) {
                 NO
               </button>
             </div>
+
+            {(() => {
+              const res = resolvedById.get(m.id)
+              const fcProb = a.probability ?? v.yes // score the AI forecast if run, else the crowd
+              return res ? (
+                <div className="pred-resolved">
+                  ✓ resolved: <b>{res.outcome ? 'happened' : 'did not'}</b>{' '}
+                  (forecast was {res.prob}%)
+                  <button
+                    className="res-undo"
+                    onClick={() => clearResolution(m.id)}
+                  >
+                    undo
+                  </button>
+                </div>
+              ) : (
+                <div className="pred-resolve">
+                  <span>resolve outcome:</span>
+                  <button
+                    onClick={() =>
+                      recordResolution(m.id, m.question, fcProb, 1)
+                    }
+                  >
+                    ✓ happened
+                  </button>
+                  <button
+                    onClick={() =>
+                      recordResolution(m.id, m.question, fcProb, 0)
+                    }
+                  >
+                    ✗ didn’t
+                  </button>
+                </div>
+              )
+            })()}
 
             {a.probability != null && (
               <div className="ai-fc">
