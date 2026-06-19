@@ -409,19 +409,20 @@ export function forecastSeries(
     buf.push(y)
   }
 
-  // 80% prediction interval per step. The 1-step residual std is ~netRmse; for
-  // multi-step closed-loop forecasts error compounds, so the band widens as
-  // √step (the standard random-walk error-growth approximation). Bounds are
-  // clamped to the observed range — the model never saw values outside it, so a
-  // band running past min/max would over-claim.
+  // 80% prediction interval per step, centered on the point forecast. The
+  // 1-step residual std is ~netRmse; for multi-step closed-loop forecasts error
+  // compounds, so the band widens as √step (the standard random-walk error-
+  // growth approximation). The band is deliberately NOT clamped to the observed
+  // range: a forecast can legitimately exceed past extremes, and clamping would
+  // both invert the interval on an overshoot (lower > upper) and bias coverage
+  // by narrowing the band near the boundaries. pred ± halfWidth is always
+  // ordered (halfWidth ≥ 0) and is exactly ±1.28·netRmse at the first step.
   const lower: number[] = []
   const upper: number[] = []
   for (let h = 0; h < predictions.length; h++) {
     const halfWidth = Z80 * netRmse * Math.sqrt(h + 1)
-    const lo2 = Math.max(min, predictions[h] - halfWidth)
-    const hi2 = Math.min(max, predictions[h] + halfWidth)
-    lower.push(Math.round(lo2 * 10) / 10)
-    upper.push(Math.round(hi2 * 10) / 10)
+    lower.push(Math.round((predictions[h] - halfWidth) * 10) / 10)
+    upper.push(Math.round((predictions[h] + halfWidth) * 10) / 10)
   }
 
   return {

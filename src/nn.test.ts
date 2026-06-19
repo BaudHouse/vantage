@@ -92,13 +92,28 @@ describe('forecastSeries', () => {
     expect(f.lower).toHaveLength(f.predictions.length)
     expect(f.upper).toHaveLength(f.predictions.length)
     f.predictions.forEach((p, h) => {
+      // the band is centered on the point forecast and never inverts
       expect(f.lower[h]).toBeLessThanOrEqual(p)
       expect(f.upper[h]).toBeGreaterThanOrEqual(p)
       // a model with real error has a band of positive width
       expect(f.upper[h]).toBeGreaterThan(f.lower[h])
-      // and the band never escapes the range the model actually observed
-      expect(f.lower[h]).toBeGreaterThanOrEqual(Math.min(...series))
-      expect(f.upper[h]).toBeLessThanOrEqual(Math.max(...series))
+    })
+    // multi-step bands widen as error compounds (√step growth)
+    const w0 = f.upper[0] - f.lower[0]
+    const wLast = f.upper[f.upper.length - 1] - f.lower[f.lower.length - 1]
+    expect(wLast).toBeGreaterThanOrEqual(w0)
+  })
+
+  it('keeps the band ordered even when the forecast overshoots the range', () => {
+    // a steep ramp drives the closed-loop forecast well past the observed max;
+    // the band must stay ordered (regression: clamping to range inverted it)
+    const series = Array.from({ length: 40 }, (_, i) => i * i) // 0,1,4,9,…,1521
+    const f = forecastSeries(series, { window: 5, hidden: 8, epochs: 300, seed: 3 })
+    expect(f.trained).toBe(true)
+    f.predictions.forEach((p, h) => {
+      expect(f.lower[h]).toBeLessThanOrEqual(p)
+      expect(f.upper[h]).toBeGreaterThanOrEqual(p)
+      expect(f.upper[h]).toBeGreaterThanOrEqual(f.lower[h])
     })
   })
 
