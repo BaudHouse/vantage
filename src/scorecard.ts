@@ -11,6 +11,14 @@ export interface Pair {
   p: number // predicted (made last cycle, from history up to then)
   a: number // realized this cycle
   prior: number // the value when the prediction was made (for direction)
+  lo?: number // staged 80% interval lower bound (optional — older pairs lack it)
+  hi?: number // staged 80% interval upper bound
+}
+
+export interface Coverage {
+  n: number // resolved pairs that carried a prediction interval
+  covered: number // how many realized values fell inside their band
+  rate: number // covered / n  (a well-calibrated 80% band targets ≈ 0.8)
 }
 
 export interface MetricScore {
@@ -25,6 +33,8 @@ export interface MetricScore {
 interface Entry {
   pendingP?: number
   pendingPrior?: number
+  pendingLo?: number
+  pendingHi?: number
   pairs: Pair[]
 }
 type Store = Record<string, Entry>
@@ -69,24 +79,52 @@ export function scoreOf(pairs: Pair[]): MetricScore {
   }
 }
 
+/** Pure: empirical coverage of the staged 80% intervals vs realized outcomes. */
+export function coverageOf(pairs: Pair[]): Coverage {
+  let n = 0
+  let covered = 0
+  for (const { a, lo, hi } of pairs) {
+    if (lo === undefined || hi === undefined) continue
+    n++
+    if (a >= lo && a <= hi) covered++
+  }
+  return { n, covered, rate: n ? covered / n : 0 }
+}
+
 /**
  * Resolve last cycle's prediction for `metric` against the value that just
  * arrived, then stage a new prediction for next cycle. `predictNext` returns
- * the model's 1-step forecast from history up to now.
+ * the model's 1-step forecast from history up to now — either a bare point, or
+ * a point with its 80% interval so we can later score the band's calibration.
  */
 export function recordCycle(
   metric: string,
   actual: number,
-  predictNext: () => number,
+  predictNext: () => number | { p: number; lo?: number; hi?: number },
 ): void {
   const s = loadScore()
   const m: Entry = s[metric] ?? { pairs: [] }
   if (m.pendingP !== undefined && m.pendingPrior !== undefined) {
-    m.pairs.push({ p: m.pendingP, a: actual, prior: m.pendingPrior })
+    m.pairs.push({
+      p: m.pendingP,
+      a: actual,
+      prior: m.pendingPrior,
+      lo: m.pendingLo,
+      hi: m.pendingHi,
+    })
     while (m.pairs.length > CAP) m.pairs.shift()
   }
   m.pendingPrior = actual
-  m.pendingP = predictNext()
+  const next = predictNext()
+  if (typeof next === 'number') {
+    m.pendingP = next
+    m.pendingLo = undefined
+    m.pendingHi = undefined
+  } else {
+    m.pendingP = next.p
+    m.pendingLo = next.lo
+    m.pendingHi = next.hi
+  }
   s[metric] = m
   saveJson(KEY, s)
 }

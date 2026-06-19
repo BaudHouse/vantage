@@ -9,7 +9,7 @@ import {
   type BacktestResult,
 } from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
-import { loadScore, scoreOf, MIN_PAIRS } from '../scorecard'
+import { loadScore, scoreOf, coverageOf, MIN_PAIRS } from '../scorecard'
 import Markdown from './Markdown'
 
 interface Props {
@@ -200,6 +200,7 @@ export default function TrendsModal({
   const scored = METRICS.map((m) => ({
     m,
     s: scoreOf(scoreStore[m.key]?.pairs ?? []),
+    cov: coverageOf(scoreStore[m.key]?.pairs ?? []),
   }))
   const biasMap: Record<string, number> = {}
   scored.forEach(({ m, s }) => {
@@ -336,7 +337,7 @@ export default function TrendsModal({
               </span>
             </div>
             <div className="sc-rows">
-              {scores.map(({ m, s }) => (
+              {scores.map(({ m, s, cov }) => (
                 <div className="sc-row" key={m.key}>
                   <span className="sc-label">{m.label}</span>
                   <span className="sc-stat">
@@ -354,6 +355,20 @@ export default function TrendsModal({
                     · {Math.round(s.hit * 100)}% direction
                     {Math.abs(s.bias) >= 0.5 && (
                       <> · bias {s.bias > 0 ? '+' : ''}{s.bias}</>
+                    )}
+                    {cov.n >= 4 && (
+                      <>
+                        {' '}
+                        ·{' '}
+                        <b
+                          className={
+                            Math.abs(cov.rate - 0.8) <= 0.15 ? 'good' : 'bad'
+                          }
+                          title="how often the realized value landed inside its 80% band (calibrated ≈ 80%)"
+                        >
+                          {Math.round(cov.rate * 100)}% in 80% band
+                        </b>
+                      </>
                     )}
                   </span>
                 </div>

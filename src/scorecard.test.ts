@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { scoreOf, recordCycle, loadScore, correct, clearScore } from './scorecard'
+import {
+  scoreOf,
+  coverageOf,
+  recordCycle,
+  loadScore,
+  correct,
+  clearScore,
+} from './scorecard'
 import { installStorage } from './test-helpers'
 
 describe('scoreOf', () => {
@@ -41,6 +48,28 @@ describe('scoreOf', () => {
   })
 })
 
+describe('coverageOf (interval calibration)', () => {
+  it('ignores pairs that carry no interval', () => {
+    const c = coverageOf([
+      { p: 10, a: 10, prior: 9 },
+      { p: 5, a: 5, prior: 4 },
+    ])
+    expect(c).toEqual({ n: 0, covered: 0, rate: 0 })
+  })
+
+  it('counts realized values that land inside their band', () => {
+    const c = coverageOf([
+      { p: 10, a: 11, prior: 9, lo: 8, hi: 14 }, // 11 in [8,14] ✓
+      { p: 10, a: 20, prior: 9, lo: 8, hi: 14 }, // 20 outside ✗
+      { p: 10, a: 8, prior: 9, lo: 8, hi: 14 }, // 8 on the edge ✓
+      { p: 10, a: 10, prior: 9 }, // no band → ignored
+    ])
+    expect(c.n).toBe(3)
+    expect(c.covered).toBe(2)
+    expect(c.rate).toBeCloseTo(2 / 3, 5)
+  })
+})
+
 describe('recordCycle + correct (outcome loop)', () => {
   beforeEach(() => {
     installStorage()
@@ -64,5 +93,17 @@ describe('recordCycle + correct (outcome loop)', () => {
     recordCycle('fires', 3, () => 8)
     recordCycle('fires', 3, () => 8) // 1 pair only
     expect(correct('fires', 50)).toBe(50)
+  })
+
+  it('stages a forecast band and resolves it into the pair for coverage', () => {
+    // first cycle stages p=12 with band [9,15]; second cycle resolves a=13
+    recordCycle('storms', 10, () => ({ p: 12, lo: 9, hi: 15 }))
+    recordCycle('storms', 13, () => ({ p: 14, lo: 11, hi: 17 }))
+    const pair = loadScore()['storms'].pairs[0]
+    expect(pair).toMatchObject({ p: 12, a: 13, lo: 9, hi: 15 })
+    expect(coverageOf(loadScore()['storms'].pairs)).toMatchObject({
+      n: 1,
+      covered: 1, // 13 fell inside [9,15]
+    })
   })
 })

@@ -582,7 +582,11 @@ export default function App() {
             epochs: 120,
             seed: 1,
           })
-          return f.trained ? f.predictions[0] : cur
+          // Stage the point AND its 80% band so next cycle can score whether
+          // the interval actually covered reality (coverage calibration).
+          return f.trained
+            ? { p: f.predictions[0], lo: f.lower[0], hi: f.upper[0] }
+            : cur
         })
       }
     }
