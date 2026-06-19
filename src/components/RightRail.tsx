@@ -355,7 +355,7 @@ const GROUP_LABEL: Record<QuoteGroup, string> = {
 
 function Markets({ quotes }: { quotes: Quote[] }) {
   const sent = sentiment(quotes)
-  const groups: QuoteGroup[] = ['defense', 'commodity', 'forex']
+  const groups: QuoteGroup[] = ['defense', 'commodity', 'forex', 'crypto']
   return (
     <div className="markets">
       <div className="mk-head">

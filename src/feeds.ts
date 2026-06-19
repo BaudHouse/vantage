@@ -182,7 +182,7 @@ async function gdeltAttempt(url: string): Promise<GeoEvent[] | null> {
  * Retries through GDELT's aggressive rate-limiting and falls back to the last
  * good snapshot so the conflict layer stays populated between successful pulls.
  */
-export async function fetchConflict(): Promise<GeoEvent[]> {
+async function fetchConflict(): Promise<GeoEvent[]> {
   const query = encodeURIComponent(
     '(airstrike OR shelling OR clashes OR offensive OR militants OR ceasefire OR drone OR rocket OR insurgents) sourcelang:eng',
   )
@@ -201,7 +201,7 @@ export async function fetchConflict(): Promise<GeoEvent[]> {
 }
 
 /** USGS — earthquakes M2.5+ in the past day. No key. GeoJSON. */
-export async function fetchQuakes(): Promise<GeoEvent[]> {
+async function fetchQuakes(): Promise<GeoEvent[]> {
   const url = `${BASE.usgs}/earthquakes/feed/v1.0/summary/2.5_day.geojson`
   try {
     const r = await tfetch(url)
@@ -231,7 +231,7 @@ export async function fetchQuakes(): Promise<GeoEvent[]> {
 }
 
 /** NASA EONET — open satellite-tracked natural events (fires, storms, volcanoes). No key. */
-export async function fetchDisasters(): Promise<GeoEvent[]> {
+async function fetchDisasters(): Promise<GeoEvent[]> {
   const url = `${BASE.eonet}/events?status=open&limit=200`
   try {
     const r = await tfetch(url)

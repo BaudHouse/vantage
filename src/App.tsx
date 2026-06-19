@@ -472,42 +472,36 @@ export default function App() {
   }, [anomalies])
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
+  // These run from event handlers, so the current `watch`/`baseline` closures
+  // are up to date — compute + persist OUTSIDE the setState updater (updaters
+  // must be pure; a localStorage write inside one double-fires under StrictMode).
   const addWatch = (name: string) => {
-    setWatch((prev) => {
-      if (prev.includes(name)) return prev
-      const next = [...prev, name]
-      saveWatch(next)
-      return next
-    })
-    setBaseline((prev) => {
-      const next = { ...prev, [name]: intensity[name] ?? 0 }
-      saveBaseline(next)
-      return next
-    })
+    if (watch.includes(name)) return
+    const nextWatch = [...watch, name]
+    const nextBase = { ...baseline, [name]: intensity[name] ?? 0 }
+    saveWatch(nextWatch)
+    saveBaseline(nextBase)
+    setWatch(nextWatch)
+    setBaseline(nextBase)
   }
   const removeWatch = (name: string) => {
-    setWatch((prev) => {
-      const next = prev.filter((n) => n !== name)
-      saveWatch(next)
-      return next
-    })
+    const nextWatch = watch.filter((n) => n !== name)
+    saveWatch(nextWatch)
+    setWatch(nextWatch)
     // Drop its baseline too so unwatched regions don't leave stale entries.
-    setBaseline((prev) => {
-      if (!(name in prev)) return prev
-      const next = { ...prev }
-      delete next[name]
-      saveBaseline(next)
-      return next
-    })
+    if (name in baseline) {
+      const nextBase = { ...baseline }
+      delete nextBase[name]
+      saveBaseline(nextBase)
+      setBaseline(nextBase)
+    }
   }
   // Acknowledge: re-baseline every watched region to its current level.
   const ackWatch = () => {
-    setBaseline(() => {
-      const next: Record<string, number> = {}
-      for (const n of watch) next[n] = intensity[n] ?? 0
-      saveBaseline(next)
-      return next
-    })
+    const next: Record<string, number> = {}
+    for (const n of watch) next[n] = intensity[n] ?? 0
+    saveBaseline(next)
+    setBaseline(next)
   }
 
   // Desktop notifications: fire once when a region crosses into an alerting

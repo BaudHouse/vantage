@@ -3,6 +3,7 @@ import type { Camera } from '../layers'
 import { fetchImageBase64 } from '../net'
 import { analyzeImage, visionModel } from '../operator'
 import { scanCameras } from '../vision'
+import { safeUrl } from '../safe'
 import Markdown from './Markdown'
 
 interface Props {
@@ -236,7 +237,7 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
                     : ' · refreshing'}
               </span>
               <a
-                href={zoom.video || live(zoom.image, lbTick)}
+                href={safeUrl(zoom.video || live(zoom.image, lbTick)) ?? '#'}
                 target="_blank"
                 rel="noreferrer"
               >

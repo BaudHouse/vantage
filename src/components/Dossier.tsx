@@ -323,14 +323,16 @@ export default function Dossier({ entity, onClose, onAsk, onCascade }: Props) {
             open source ↗
           </a>
         )}
-        <a
-          className="dossier-src"
-          href={`https://www.google.com/maps/@${e.lat},${e.lng},8z`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          locate on map ↗
-        </a>
+        {Number.isFinite(e.lat) && Number.isFinite(e.lng) && (
+          <a
+            className="dossier-src"
+            href={`https://www.google.com/maps/@${e.lat},${e.lng},8z`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            locate on map ↗
+          </a>
+        )}
       </div>
     </aside>
   )
