@@ -208,6 +208,9 @@ export function forecastMultivariate(
   const T = matrix.length
   const F = matrix[0]?.length ?? 0
   if (F === 0 || targetIdx < 0 || targetIdx >= F) return EMPTY_MULTI
+  // Require a rectangular matrix — a ragged row would leave some feature's
+  // min/max at ±Infinity and corrupt normalization into NaN.
+  if (matrix.some((row) => row.length !== F)) return { ...EMPTY_MULTI, features: F }
   if (T < window + 8) return { ...EMPTY_MULTI, features: F }
 
   const lo = 0.1

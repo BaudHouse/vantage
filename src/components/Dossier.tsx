@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ENTITY_COLOR, ENTITY_GLYPH, entityTitle, type Entity } from '../layers'
 import type {
   Aircraft,
@@ -109,6 +109,10 @@ export default function Dossier({ entity, onClose, onAsk, onCascade }: Props) {
   const [vBusy, setVBusy] = useState(false)
   const [vResult, setVResult] = useState<string | null>(null)
   const [vErr, setVErr] = useState<string | null>(null)
+  // The vision call can run ~120s; if the dossier closes mid-request we must
+  // not setState on the unmounted component.
+  const mounted = useRef(true)
+  useEffect(() => () => void (mounted.current = false), [])
   useEffect(() => {
     setVResult(null)
     setVErr(null)
@@ -119,12 +123,14 @@ export default function Dossier({ entity, onClose, onAsk, onCascade }: Props) {
     setVErr(null)
     setVResult(null)
     const model = await visionModel()
+    if (!mounted.current) return
     if (!model) {
       setVErr('No vision model found. Run `ollama pull qwen2.5vl:7b`.')
       setVBusy(false)
       return
     }
     const b64 = await fetchImageBase64(cam.image)
+    if (!mounted.current) return
     if (!b64) {
       setVErr('Could not capture the camera frame.')
       setVBusy(false)
@@ -135,6 +141,7 @@ export default function Dossier({ entity, onClose, onAsk, onCascade }: Props) {
       b64,
       `Analyze this live camera at ${cam.name}${cam.region ? ` (${cam.region})` : ''}.`,
     )
+    if (!mounted.current) return
     setVResult(out ?? '⚠ Vision model unreachable.')
     setVBusy(false)
   }

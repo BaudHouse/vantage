@@ -27,7 +27,9 @@ async function tfetch(url: string, ms = 9000): Promise<any | null> {
 
 function num(v: any): number | null {
   const n = Number(v)
-  return Number.isFinite(n) && n !== 0 ? n : null
+  // Accept 0 — London (TfL) cameras sit on the prime meridian (lng ≈ 0) and
+  // equatorial cams have lat ≈ 0. Only non-finite values are invalid here.
+  return Number.isFinite(n) ? n : null
 }
 
 /** NYC DOT — truly live (1-2s refresh) JPEG cameras. */
@@ -39,7 +41,7 @@ async function fetchNyc(limit = 400): Promise<Camera[]> {
     if (out.length >= limit) break
     const lat = num(c?.latitude)
     const lng = num(c?.longitude)
-    if (!lat || !lng || c?.isOnline !== 'true') continue
+    if (lat == null || lng == null || c?.isOnline !== 'true') continue
     out.push({
       kind: 'camera',
       id: `nyc-${c.id}`,
@@ -88,7 +90,7 @@ async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
       const img = c?.imageData?.static?.currentImageURL
       const lat = num(loc?.latitude)
       const lng = num(loc?.longitude)
-      if (!lat || !lng || !img || img.length < 5) continue
+      if (lat == null || lng == null || !img || img.length < 5) continue
       out.push({
         kind: 'camera',
         id: `ct-${c?.index ?? `${lat},${lng}`}`,
@@ -116,7 +118,7 @@ async function fetchTfl(limit = 400): Promise<Camera[]> {
     if (out.length >= limit) break
     const lat = num(c?.lat)
     const lng = num(c?.lon)
-    if (!lat || !lng) continue
+    if (lat == null || lng == null) continue
     const props: any[] = c?.additionalProperties ?? []
     const get = (k: string) => props.find((p) => p?.key === k)?.value
     const img = get('imageUrl')

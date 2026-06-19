@@ -6,6 +6,7 @@
 
 import { chat, embed, embedModel, type ChatMsg } from './operator'
 import { anySimilar } from './embed'
+import { firstBalanced } from './jsonx'
 
 export type CascadeDomain =
   | 'MIL'
@@ -77,10 +78,10 @@ export function parseCascade(text: string): Cascade {
   try {
     data = JSON.parse(text)
   } catch {
-    const m = text.match(/\{[\s\S]*\}/)
-    if (m) {
+    const span = firstBalanced(text, '{', '}')
+    if (span) {
       try {
-        data = JSON.parse(m[0])
+        data = JSON.parse(span)
       } catch {
         return { chains: [], bottomLine: '' }
       }

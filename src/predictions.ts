@@ -41,7 +41,16 @@ const GEN_KEY = 'vantage.genmarkets.v1'
 
 export function loadGenerated(): Market[] {
   const arr = loadJson<Market[]>(GEN_KEY, [])
-  return Array.isArray(arr) ? arr : []
+  return Array.isArray(arr)
+    ? arr.filter(
+        (m): m is Market =>
+          !!m &&
+          typeof m === 'object' &&
+          typeof m.id === 'string' &&
+          typeof m.question === 'string' &&
+          typeof m.seedYes === 'number',
+      )
+    : []
 }
 
 export function saveGenerated(markets: Market[]): void {
@@ -70,7 +79,8 @@ const KEY = 'vantage.votes.v1'
 type Votes = Record<string, 'yes' | 'no'>
 
 export function getVotes(): Votes {
-  return loadJson<Votes>(KEY, {})
+  const v = loadJson<Votes>(KEY, {})
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {}
 }
 
 export function castVote(id: string, side: 'yes' | 'no'): Votes {

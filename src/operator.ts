@@ -4,6 +4,7 @@
 // loopback API directly.
 
 import { rawFetch } from './net'
+import { firstBalanced } from './jsonx'
 
 const DEV = import.meta.env.DEV
 const OLLAMA = DEV ? '/ollama' : 'http://127.0.0.1:11434'
@@ -326,8 +327,16 @@ export async function forecastMarket(
     { temperature: 0.5 },
   )
   if (text == null) return null
-  const m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/)
-  const probability = m ? Math.max(1, Math.min(99, Number(m[1]))) : 50
+  // Anchor on the labeled answer "P: NN%" the prompt asks for; only fall back
+  // to a bare percentage (the LAST one — closest to the conclusion) if absent,
+  // so a reasoning figure earlier in the text isn't mistaken for the answer.
+  const labeled = text.match(/P:\s*([0-9]{1,3}(?:\.[0-9]+)?)\s*%?/i)
+  let pct: number | null = labeled ? Number(labeled[1]) : null
+  if (pct == null) {
+    const all = [...text.matchAll(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/g)]
+    if (all.length) pct = Number(all[all.length - 1][1])
+  }
+  const probability = pct != null ? Math.max(1, Math.min(99, pct)) : 50
   const rationale = text.replace(/P:\s*[0-9.]+\s*%?/i, '').trim()
   return { probability, rationale }
 }
@@ -355,10 +364,10 @@ export function parseProposed(text: string): ProposedMarket[] {
   try {
     data = JSON.parse(text)
   } catch {
-    const m = text.match(/\[[\s\S]*\]/)
-    if (m) {
+    const span = firstBalanced(text, '[', ']') ?? firstBalanced(text, '{', '}')
+    if (span) {
       try {
-        data = JSON.parse(m[0])
+        data = JSON.parse(span)
       } catch {
         return []
       }

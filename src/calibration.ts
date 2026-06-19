@@ -20,7 +20,15 @@ const CAP = 300
 
 export function loadResolutions(): Resolution[] {
   const a = loadJson<Resolution[]>(KEY, [])
-  return Array.isArray(a) ? a : []
+  return Array.isArray(a)
+    ? a.filter(
+        (r): r is Resolution =>
+          !!r &&
+          typeof r === 'object' &&
+          typeof r.prob === 'number' &&
+          (r.outcome === 0 || r.outcome === 1),
+      )
+    : []
 }
 
 export function resolve(r: Omit<Resolution, 't'> & { t?: number }): void {

@@ -111,8 +111,13 @@ function drawIcon(type: string, color: string): THREE.Texture {
 }
 
 // Materials are cached and REUSED across refreshes (keyed by type+color+heading
-// bucket) so we never leak GPU resources when the aircraft feed re-polls.
+// bucket) so we never leak GPU resources when the aircraft feed re-polls. The
+// key space is finite (≈types×colors×72 buckets) but we still cap + dispose on
+// eviction so a long-running session can't accumulate stale heading-bucket
+// materials unbounded. (Textures live in the small texCache and are shared, so
+// they are NOT disposed here.)
 const matCache = new Map<string, THREE.SpriteMaterial>()
+const MAT_CAP = 800
 
 function materialFor(
   type: string,
@@ -123,6 +128,13 @@ function materialFor(
   const key = `${type}:${color}:${bucket}`
   let m = matCache.get(key)
   if (!m) {
+    if (matCache.size >= MAT_CAP) {
+      const oldest = matCache.keys().next().value
+      if (oldest !== undefined) {
+        matCache.get(oldest)?.dispose()
+        matCache.delete(oldest)
+      }
+    }
     m = new THREE.SpriteMaterial({
       map: drawIcon(type, color),
       transparent: true,
@@ -292,7 +304,9 @@ export default function GlobeView({
       if (radarMeshRef.current) {
         scene.remove(radarMeshRef.current)
         radarMeshRef.current.geometry.dispose()
-        ;(radarMeshRef.current.material as THREE.Material).dispose()
+        const mat = radarMeshRef.current.material as THREE.MeshBasicMaterial
+        mat.map?.dispose() // the per-frame CanvasTexture — the real recurring leak
+        mat.dispose()
         radarMeshRef.current = null
       }
     }

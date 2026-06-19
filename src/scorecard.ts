@@ -35,7 +35,7 @@ export const MIN_PAIRS = 6 // before we trust the learned bias
 
 export function loadScore(): Store {
   const s = loadJson<Store>(KEY, {})
-  return s && typeof s === 'object' ? s : {}
+  return s && typeof s === 'object' && !Array.isArray(s) ? s : {}
 }
 
 /** Pure: realized accuracy stats from a metric's (predicted, actual) pairs. */
