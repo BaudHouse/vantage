@@ -9,7 +9,13 @@ import {
   type BacktestResult,
 } from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
-import { loadScore, scoreOf, coverageOf, MIN_PAIRS } from '../scorecard'
+import {
+  loadScore,
+  scoreOf,
+  coverageOf,
+  forecastTrust as trustOf,
+  MIN_PAIRS,
+} from '../scorecard'
 import Markdown from './Markdown'
 
 interface Props {
@@ -91,11 +97,19 @@ export default function TrendsModal({
         fc?.trained && fc.upper.length > 0 && fc.upper[0] > fc.lower[0]
           ? `, 80% interval ${fc.lower[0]}–${fc.upper[0]}`
           : ''
+      // Only cite the forecast to the analyst when it's trusted, and say which
+      // tier — a model that failed against real outcomes is omitted, not passed
+      // off as a confident driver.
+      const trust = fc?.trained ? trustFor(a.key, fc.skill) : 'unproven'
       const proj =
-        fc?.trained && fc.skill > 0.02
-          ? ` | neural forecast next: ${fc.predictions.join(', ')}${band} (beats naive by ${Math.round(
-              fc.skill * 100,
-            )}%)`
+        fc?.trained && trust !== 'unproven'
+          ? ` | neural forecast next: ${fc.predictions.join(', ')}${band} (${
+              trust === 'validated'
+                ? `validated, +${Math.round(
+                    (realized[a.key]?.skill ?? 0) * 100,
+                  )}% on real outcomes`
+                : `provisional, +${Math.round(fc.skill * 100)}% vs naive on one split`
+            })`
           : ''
       return `${a.label}: ${a.current} vs baseline ${a.mean} (${
         a.z >= 99 ? 'spike' : `${a.z}σ`
@@ -181,27 +195,40 @@ export default function TrendsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, snaps.length ? snaps[snaps.length - 1].t : 0])
 
-  // Forecast surprises: metrics where the latest reading diverges sharply from
-  // a *skilful* model's expectation — the learned pattern broke. Complements
-  // the z-score anomalies (a value can fit its range yet defy its own cycle).
-  const surprises = METRICS.map((m) => ({ m, fc: forecasts[m.key] })).filter(
-    ({ m, fc }) =>
-      !!fc?.trained &&
-      fc.skill > 0.05 &&
-      fc.surprise >= 2.5 &&
-      !anomalies.some((a) => a.key === m.key),
-  )
-  const currentOf = (key: string) =>
-    snaps.length ? snaps[snaps.length - 1].m[key] ?? 0 : 0
-
-  // Realized forward-forecast accuracy (scored against what actually happened),
-  // and the learned per-metric bias we use to debias future forecasts.
+  // Realized forward-forecast accuracy (scored against what ACTUALLY happened) —
+  // the ground truth we trust over any single-split skill estimate. Computed
+  // first so it can gate the surprise alerts below.
   const scoreStore = loadScore()
   const scored = METRICS.map((m) => ({
     m,
     s: scoreOf(scoreStore[m.key]?.pairs ?? []),
     cov: coverageOf(scoreStore[m.key]?.pairs ?? []),
   }))
+  const realized: Record<string, { skill: number; n: number }> = {}
+  scored.forEach(({ m, s }) => {
+    realized[m.key] = { skill: s.skill, n: s.n }
+  })
+  // Trust a metric's forecast by its realized track record, falling back to its
+  // single-split skill (see scorecard.forecastTrust). Gates alerts so a model
+  // that has empirically failed against reality can't cry wolf.
+  const trustFor = (key: string, splitSkill: number) =>
+    trustOf(realized[key]?.skill ?? 0, realized[key]?.n ?? 0, splitSkill)
+
+  // Forecast surprises: metrics where the latest reading diverges sharply from a
+  // *trusted* model's expectation — the learned pattern broke. Complements the
+  // z-score anomalies (a value can fit its range yet defy its own cycle). Gated
+  // on trust so a model that has failed against real outcomes never alerts.
+  const surprises = METRICS.map((m) => ({ m, fc: forecasts[m.key] })).filter(
+    ({ m, fc }) =>
+      !!fc?.trained &&
+      fc.surprise >= 2.5 &&
+      trustFor(m.key, fc.skill) !== 'unproven' &&
+      !anomalies.some((a) => a.key === m.key),
+  )
+  const currentOf = (key: string) =>
+    snaps.length ? snaps[snaps.length - 1].m[key] ?? 0 : 0
+
+  // Learned per-metric bias used to debias future forecasts.
   const biasMap: Record<string, number> = {}
   scored.forEach(({ m, s }) => {
     biasMap[m.key] = s.n >= MIN_PAIRS ? s.bias : 0
@@ -535,6 +562,15 @@ export default function TrendsModal({
                                 ? `${Math.round(fc.skill * 100)}% vs naive`
                                 : 'flat'}
                           </em>
+                          {trustFor(m.key, fc.skill) === 'validated' && (
+                            <em
+                              className="good"
+                              style={{ marginLeft: 4 }}
+                              title={`validated on ${realized[m.key].n} real outcomes (beats naive)`}
+                            >
+                              ✓ validated
+                            </em>
+                          )}
                         </span>
                       )}
                     </div>

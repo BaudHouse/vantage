@@ -79,6 +79,25 @@ export function scoreOf(pairs: Pair[]): MetricScore {
   }
 }
 
+export type Trust = 'validated' | 'provisional' | 'unproven'
+
+/**
+ * How much to trust a forecast before letting it drive an alert or be cited to
+ * the analyst. A model scored against enough REAL outcomes is judged on that
+ * track record (validated if it still beats naive, else unproven — it failed,
+ * so it must not cry wolf). A model with no track record yet falls back to its
+ * provisional single train/test-split skill.
+ */
+export function forecastTrust(
+  realizedSkill: number,
+  realizedN: number,
+  splitSkill: number,
+  minPairs = MIN_PAIRS,
+): Trust {
+  if (realizedN >= minPairs) return realizedSkill > 0.02 ? 'validated' : 'unproven'
+  return splitSkill > 0.05 ? 'provisional' : 'unproven'
+}
+
 /** Pure: empirical coverage of the staged 80% intervals vs realized outcomes. */
 export function coverageOf(pairs: Pair[]): Coverage {
   let n = 0

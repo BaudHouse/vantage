@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   scoreOf,
   coverageOf,
+  forecastTrust,
   recordCycle,
   loadScore,
   correct,
   clearScore,
+  MIN_PAIRS,
 } from './scorecard'
 import { installStorage } from './test-helpers'
 
@@ -67,6 +69,28 @@ describe('coverageOf (interval calibration)', () => {
     expect(c.n).toBe(3)
     expect(c.covered).toBe(2)
     expect(c.rate).toBeCloseTo(2 / 3, 5)
+  })
+})
+
+describe('forecastTrust (alert gating)', () => {
+  const N = MIN_PAIRS
+  it('is provisional on a fresh model with only a positive single-split skill', () => {
+    // no realized track record yet (n < MIN_PAIRS) → falls back to split skill
+    expect(forecastTrust(0, 0, 0.2)).toBe('provisional')
+    expect(forecastTrust(0, N - 1, 0.2)).toBe('provisional')
+  })
+  it('is unproven when neither realized nor split skill clears the bar', () => {
+    expect(forecastTrust(0, 0, 0.0)).toBe('unproven')
+    expect(forecastTrust(0, N - 1, 0.01)).toBe('unproven')
+  })
+  it('is validated once a real track record still beats naive', () => {
+    expect(forecastTrust(0.3, N, -1)).toBe('validated') // split skill irrelevant now
+  })
+  it('is UNPROVEN when a real track record shows the model failed', () => {
+    // the key anti-cry-wolf case: high single-split skill, but it lost on real
+    // outcomes → not trusted to drive an alert
+    expect(forecastTrust(-0.1, N, 0.9)).toBe('unproven')
+    expect(forecastTrust(0.0, N, 0.9)).toBe('unproven')
   })
 })
 
