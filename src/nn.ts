@@ -171,6 +171,26 @@ export interface ForecastOpts {
   seed?: number
 }
 
+export interface BacktestResult {
+  netRmse: number // aggregate OUT-OF-SAMPLE RMSE across every walk-forward fold
+  naiveRmse: number // persistence baseline RMSE across the same folds
+  skill: number // 1 - netRmse/naiveRmse  (>0 means it genuinely beats persistence)
+  mae: number // aggregate net mean-absolute-error (raw scale)
+  folds: number // # of out-of-sample 1-step predictions actually evaluated
+  winRate: number // fraction of folds where the net beat naive on that point
+  trained: boolean // false if the series is too short to walk forward
+}
+
+const EMPTY_BACKTEST: BacktestResult = {
+  netRmse: 0,
+  naiveRmse: 0,
+  skill: 0,
+  mae: 0,
+  folds: 0,
+  winRate: 0,
+  trained: false,
+}
+
 export interface MultiForecast {
   prediction: number // next value of the target signal (raw scale)
   netRmse: number // multivariate model RMSE on a held-out tail
@@ -383,5 +403,105 @@ export function forecastSeries(
     trained: true,
     predictedLast,
     surprise: Math.round(surprise * 10) / 10,
+  }
+}
+
+/**
+ * WALK-FORWARD backtest of the windowed MLP — the honest, low-variance measure
+ * of out-of-sample skill that a single train/test split (forecastSeries) cannot
+ * give. For each fold we train a FRESH net on series[0..split), make one 1-step
+ * open-loop prediction at `split`, and score it against the realized value and
+ * against naive persistence. The split then advances across the held-out region.
+ *
+ * Two properties make this trustworthy:
+ *  - No look-ahead leakage: each fold normalizes on its TRAINING slice only, so
+ *    the point being predicted never informs its own min/max scaling.
+ *  - Retrain-per-fold: aggregating many independent out-of-sample predictions
+ *    averages out the luck of any one split — this is the standard backtest for
+ *    time-series models, and what separates a measured forecaster from a demo.
+ *
+ * Cost is bounded by `maxFolds` (default 30): on long series the split advances
+ * in strides so the walk never trains more than ~maxFolds nets.
+ */
+export function backtestSeries(
+  series: number[],
+  opts: ForecastOpts & { minTrain?: number; maxFolds?: number } = {},
+): BacktestResult {
+  const window = opts.window ?? 6
+  const hidden = opts.hidden ?? 8
+  const epochs = opts.epochs ?? 250
+  // Each fold needs a window plus a few points to learn from before it can be
+  // scored, and we need at least a handful of folds for the average to mean
+  // anything.
+  const minTrain = Math.max(opts.minTrain ?? window + 8, window + 4)
+  if (series.length < minTrain + 3) return EMPTY_BACKTEST
+
+  const firstSplit = minTrain
+  const lastSplit = series.length - 1 // we predict series[split]
+  const evalCount = lastSplit - firstSplit + 1
+  const maxFolds = Math.max(1, opts.maxFolds ?? 30)
+  const step = Math.max(1, Math.ceil(evalCount / maxFolds))
+  const lo = 0.1
+  const hi = 0.9
+
+  let netSq = 0
+  let naiveSq = 0
+  let maeSum = 0
+  let wins = 0
+  let count = 0
+  for (let split = firstSplit; split <= lastSplit; split += step) {
+    // Scale on the training slice ONLY — no leakage from the future point.
+    let min = Infinity
+    let max = -Infinity
+    for (let i = 0; i < split; i++) {
+      if (series[i] < min) min = series[i]
+      if (series[i] > max) max = series[i]
+    }
+    const range = max - min
+    if (range === 0) continue // flat training window this fold — nothing to learn
+    const norm = (v: number) => ((v - min) / range) * (hi - lo) + lo
+    const denorm = (n: number) => ((n - lo) / (hi - lo)) * range + min
+
+    const net = new Net([window, hidden, 1], {
+      eta: 0.15,
+      alpha: 0.5,
+      hiddenAct: 'tanh',
+      outputAct: 'sigmoid',
+      seed: opts.seed,
+    })
+    for (let e = 0; e < epochs; e++) {
+      for (let t = window; t < split; t++) {
+        const win = new Array(window)
+        for (let k = 0; k < window; k++) win[k] = norm(series[t - window + k])
+        net.train(win, [norm(series[t])])
+      }
+    }
+
+    const inWin = new Array(window)
+    for (let k = 0; k < window; k++) inWin[k] = norm(series[split - window + k])
+    const p = denorm(net.forward(inWin)[0])
+    const actual = series[split]
+    const naive = series[split - 1] // persistence
+    const netErr = Math.abs(p - actual)
+    const naiveErr = Math.abs(naive - actual)
+    netSq += (p - actual) ** 2
+    naiveSq += (naive - actual) ** 2
+    maeSum += netErr
+    if (netErr < naiveErr) wins++
+    count++
+  }
+  if (count === 0) return EMPTY_BACKTEST
+
+  const netRmse = Math.sqrt(netSq / count)
+  const naiveRmse = Math.sqrt(naiveSq / count)
+  const skill = naiveRmse > 1e-9 ? 1 - netRmse / naiveRmse : 0
+  return {
+    netRmse,
+    naiveRmse,
+    skill,
+    mae: maeSum / count,
+    folds: count,
+    winRate: wins / count,
+    trained: true,
   }
 }

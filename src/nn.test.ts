@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { Net, forecastSeries, forecastMultivariate } from './nn'
+import {
+  Net,
+  forecastSeries,
+  forecastMultivariate,
+  backtestSeries,
+} from './nn'
 
 describe('Net (backprop core)', () => {
   it('learns XOR (non-linear, needs a hidden layer)', () => {
@@ -79,6 +84,50 @@ describe('forecastSeries', () => {
     const series = Array.from({ length: 90 }, (_, i) => 50 + 30 * Math.sin(i / 3))
     const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 5 })
     expect(f.surprise).toBeLessThan(3)
+  })
+})
+
+describe('backtestSeries (walk-forward validation)', () => {
+  it('returns trained=false for too-short series', () => {
+    expect(backtestSeries([1, 2, 3, 4, 5]).trained).toBe(false)
+  })
+
+  it('evaluates several out-of-sample folds and beats naive on a clean cycle', () => {
+    const series = Array.from({ length: 120 }, (_, i) => 50 + 40 * Math.sin(i / 3))
+    const b = backtestSeries(series, {
+      window: 8,
+      hidden: 10,
+      epochs: 400,
+      seed: 1,
+    })
+    expect(b.trained).toBe(true)
+    // walk-forward actually walked — multiple independent out-of-sample points
+    expect(b.folds).toBeGreaterThanOrEqual(5)
+    // retrained-per-fold skill should be positive on a learnable signal
+    expect(b.skill).toBeGreaterThan(0)
+    // and the net should win the majority of individual folds
+    expect(b.winRate).toBeGreaterThan(0.5)
+    // every aggregate is finite and well-formed
+    expect(Number.isFinite(b.netRmse)).toBe(true)
+    expect(Number.isFinite(b.naiveRmse)).toBe(true)
+    expect(b.mae).toBeGreaterThanOrEqual(0)
+  })
+
+  it('caps the number of trained folds via maxFolds', () => {
+    const series = Array.from({ length: 200 }, (_, i) => 50 + 30 * Math.sin(i / 4))
+    const b = backtestSeries(series, { window: 6, epochs: 80, seed: 2, maxFolds: 12 })
+    expect(b.trained).toBe(true)
+    expect(b.folds).toBeLessThanOrEqual(12)
+    expect(b.folds).toBeGreaterThan(0)
+  })
+
+  it('is deterministic for a fixed seed', () => {
+    const series = Array.from({ length: 80 }, (_, i) => 20 + 15 * Math.sin(i / 2))
+    const a = backtestSeries(series, { window: 6, epochs: 120, seed: 7 })
+    const b = backtestSeries(series, { window: 6, epochs: 120, seed: 7 })
+    expect(a.skill).toBe(b.skill)
+    expect(a.netRmse).toBe(b.netRmse)
+    expect(a.folds).toBe(b.folds)
   })
 })
 

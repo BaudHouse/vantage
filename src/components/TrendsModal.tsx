@@ -4,7 +4,9 @@ import type { Anomaly } from '../anomaly'
 import {
   forecastSeries,
   forecastMultivariate,
+  backtestSeries,
   type SeriesForecast,
+  type BacktestResult,
 } from '../nn'
 import { assessSituations, ollamaModel } from '../operator'
 import { loadScore, scoreOf, MIN_PAIRS } from '../scorecard'
@@ -67,6 +69,13 @@ export default function TrendsModal({
     err?: string
   } | null>(null)
   const assessedSigRef = useRef<string>('')
+  // On-demand walk-forward validation. Heavier than the live single-split
+  // forecast (it retrains a fresh net per fold per metric), so it runs only when
+  // the analyst explicitly clicks "validate" — never on every snapshot.
+  const [backtest, setBacktest] = useState<{
+    busy?: boolean
+    rows?: { key: string; label: string; b: BacktestResult }[]
+  } | null>(null)
 
   const runAssess = async (anoms: Anomaly[]) => {
     if (!anoms.length) return
@@ -90,6 +99,30 @@ export default function TrendsModal({
     })
     const text = await assessSituations(model, spikes, getContext())
     setAssess(text ? { text } : { err: 'Operator unreachable.' })
+  }
+
+  // Walk-forward backtest of every metric's history — the honest, low-variance
+  // out-of-sample skill. Deferred a tick so the "validating…" state paints
+  // before the synchronous retrain loop blocks the thread.
+  const runBacktest = () => {
+    setBacktest({ busy: true })
+    setTimeout(() => {
+      const rows = METRICS.map((met, i) => {
+        const s = snaps.map((x) => x.m[met.key] ?? 0)
+        return {
+          key: met.key,
+          label: met.label,
+          b: backtestSeries(s, {
+            window: 6,
+            hidden: 8,
+            epochs: 200,
+            maxFolds: 24,
+            seed: i + 1,
+          }),
+        }
+      }).filter((r) => r.b.trained)
+      setBacktest({ rows })
+    }, 30)
   }
 
   // Auto-assess while open when situations are developing, but only once per
@@ -233,6 +266,59 @@ export default function TrendsModal({
                     ? `${Math.round(multi.skill * 100)}% vs naive — no extra signal yet`
                     : 'on par with naive so far'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {anyForecast && (
+          <div className="score-card">
+            <div className="sc-head">
+              ⊕ WALK-FORWARD VALIDATION
+              <span className="sc-sub">
+                retrains the net per fold and scores each step out-of-sample —
+                the honest skill, not one lucky split
+              </span>
+            </div>
+            {backtest?.rows && backtest.rows.length > 0 && (
+              <div className="sc-rows">
+                {backtest.rows.map(({ key, label, b }) => (
+                  <div className="sc-row" key={key}>
+                    <span className="sc-label">{label}</span>
+                    <span className="sc-stat">
+                      <em>{b.folds}</em> folds ·{' '}
+                      <b
+                        className={
+                          b.skill > 0.02 ? 'good' : b.skill < -0.02 ? 'bad' : ''
+                        }
+                      >
+                        {b.skill > 0
+                          ? `+${Math.round(b.skill * 100)}%`
+                          : `${Math.round(b.skill * 100)}%`}{' '}
+                        vs naive
+                      </b>{' '}
+                      · {Math.round(b.winRate * 100)}% folds won
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {backtest?.rows && backtest.rows.length === 0 && (
+              <div className="sc-sub">
+                Not enough history to walk forward yet — keep logging snapshots.
+              </div>
+            )}
+            <div className="ew-actions">
+              <button
+                className="ew-assess"
+                onClick={runBacktest}
+                disabled={backtest?.busy}
+              >
+                {backtest?.busy
+                  ? '◍ validating…'
+                  : backtest?.rows
+                    ? '↻ re-validate'
+                    : '⊕ Validate (walk-forward)'}
+              </button>
             </div>
           </div>
         )}
