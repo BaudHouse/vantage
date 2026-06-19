@@ -180,7 +180,7 @@ export async function fetchWxAlerts(): Promise<WxAlert[]> {
   const out: WxAlert[] = []
   for (const f of feats) {
     const c = polyCentroid(f?.geometry)
-    if (!c) continue
+    if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue
     const p = f?.properties ?? {}
     out.push({
       kind: 'alert',
@@ -202,7 +202,8 @@ export async function fetchWxAlerts(): Promise<WxAlert[]> {
 export async function fetchSatellites(): Promise<Satellite[]> {
   // wheretheiss is rate-limited (~1 req/s) and can be slow through a proxy.
   const j = await getJson(`${B.iss}/v1/satellites/25544`, 12000)
-  if (!j || typeof j.latitude !== 'number') return []
+  if (!j || typeof j.latitude !== 'number' || typeof j.longitude !== 'number')
+    return []
   return [
     {
       kind: 'satellite',
@@ -259,12 +260,15 @@ export async function fetchEmscQuakes(): Promise<GeoEvent[]> {
     const c = f?.geometry?.coordinates
     const p = f?.properties ?? {}
     if (!Array.isArray(c) || c.length < 2) continue
+    const lat = Number(c[1])
+    const lng = Number(c[0])
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
     const mag = Number(p.mag ?? 0)
     out.push({
       id: `emsc-${f.id ?? p.unid}`,
       kind: 'quake',
-      lat: Number(c[1]),
-      lng: Number(c[0]),
+      lat,
+      lng,
       title: `M${mag.toFixed(1)} · ${p.flynn_region ?? 'earthquake'}`,
       detail: `Magnitude ${mag.toFixed(1)} · ${p.depth ?? '?'} km depth (EMSC)`,
       url: p.url ?? undefined,

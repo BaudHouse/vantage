@@ -15,6 +15,33 @@ function imgProxy(): Plugin {
           res.statusCode = 400
           return res.end('bad url')
         }
+        // SSRF guard: this dev middleware fetches arbitrary URLs server-side, so
+        // refuse internal/loopback/link-local/private hosts (incl. cloud
+        // metadata) even though image URLs only come from trusted feeds.
+        let host = ''
+        try {
+          host = new URL(target).hostname.toLowerCase()
+        } catch {
+          res.statusCode = 400
+          return res.end('bad url')
+        }
+        if (
+          host === 'localhost' ||
+          host.endsWith('.localhost') ||
+          host === '0.0.0.0' ||
+          host === '::1' ||
+          host === '169.254.169.254' ||
+          /^127\./.test(host) ||
+          /^10\./.test(host) ||
+          /^192\.168\./.test(host) ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+          /^169\.254\./.test(host) ||
+          host.endsWith('.internal') ||
+          host.endsWith('.local')
+        ) {
+          res.statusCode = 403
+          return res.end('blocked host')
+        }
         fetch(target)
           .then(async (r) => {
             const buf = Buffer.from(await r.arrayBuffer())
