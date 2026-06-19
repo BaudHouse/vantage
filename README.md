@@ -39,14 +39,42 @@ weather-radar layers, and a local Ollama model reasons over all of it.
   [Bikebrainz/NeuralNetwork](https://github.com/Bikebrainz/NeuralNetwork) — the
   overhauled Urschel **sunspot backprop net** (MLP, SGD+momentum, min/max
   normalization, windowed open/closed-loop forecasting) — **trains in the
-  browser** on each metric's live history and projects the next steps, scored
-  against a naive-persistence baseline (`skill = 1 − net/naive`). No backend,
-  no GPU. Unit-tested incl. the golden checks (learns XOR, beats persistence on
-  a sine wave). *(`src/nn.ts`)*
-- **Butterfly-effect cascade.** Enter any trigger and the local model maps how
-  it cascades into compounding cross-domain effect chains
+  browser** on each metric's live history and projects the next steps, each with
+  an **80% prediction interval** derived from the model's own out-of-sample error
+  (so every forecast carries calibrated uncertainty, not just a point). A second
+  **multivariate "all-signal" model** forecasts one metric from a window of
+  *every* signal, learning cross-signal leading relationships a univariate model
+  would miss. Both are scored against a naive-persistence baseline
+  (`skill = 1 − net/naive`), and a **forecast-surprise** flag fires when the
+  latest reading breaks a model that is otherwise skilful. No backend, no GPU.
+  Unit-tested incl. golden checks (learns XOR, beats persistence on a sine wave).
+  *(`src/nn.ts`)*
+- **Forecast accountability — the part most "AI forecasts" skip.** Vantage
+  doesn't just predict; it grades itself against reality, entirely on-device:
+  - **Outcome-driven scorecard.** Each cycle's 1-step forecast is resolved by the
+    *next* cycle's real value; Vantage keeps the (predicted, realized) pairs and
+    learns realized RMSE, **systematic bias** — and auto-corrects future
+    forecasts by it (marked ↺) — plus direction accuracy. It scores against what
+    *actually happened*, not a held-out slice of the past. *(`src/scorecard.ts`)*
+  - **Walk-forward backtest.** On demand, a fresh net is **retrained per fold**
+    across an expanding window, each fold making one out-of-sample prediction — a
+    low-variance, leakage-free skill estimate a single train/test split can't
+    give. *(`backtestSeries`)*
+  - **Interval coverage calibration.** The 80% bands are themselves checked: how
+    often did reality actually land inside? A well-calibrated band covers ≈80%,
+    surfaced per-metric so over/under-confidence is visible, not assumed.
+  - **Brier-scored probabilistic outlook.** The Likely/Possible/Watch forward
+    forecast is calibrated with a Brier score + reliability bins against a
+    base-rate baseline. *(`src/calibration.ts`)*
+- **Butterfly-effect cascade (multi-model consensus).** Enter any trigger and the
+  local model maps how it cascades into compounding cross-domain effect chains
   (MIL/ECON/CIVIL/ENERGY/CYBER/DIPLO/SUPPLY), each step with a conditional
-  likelihood; the product is the chain's compounded probability. Reachable from
+  likelihood whose product is the chain's compounded probability. For accuracy it
+  runs an **ensemble**: several independent drafts (across more than one local
+  model) are **reconciled into a calibrated consensus**, a **red-team critique**
+  pass then stress-tests each likelihood against base rates for over-confidence,
+  and chain-level **agreement is measured by embedding cosine** — so a recurring
+  conclusion is weighted by how many drafts genuinely reached it. Reachable from
   a nav button, any dossier entity, or a developing situation. *(`src/cascade.ts`)*
 - **AI assessment & 24–72h outlook.** Developing situations are auto-assessed
   (driver + what's next, anchored to the neural projection); the daily briefing
@@ -79,7 +107,9 @@ weather-radar layers, and a local Ollama model reasons over all of it.
 npm install
 npm run dev            # http://localhost:5174  (browser)
 npm run electron:dev   # desktop app
-npm test               # vitest (gazetteer, choropleth, XSS guards)
+npm test               # vitest — 120 tests (forecaster + backtest + intervals,
+                       #   scorecard coverage, Brier calibration, gazetteer,
+                       #   choropleth, XSS guards, feed NaN-guards, …)
 npm run build          # type-checked production build
 ```
 
