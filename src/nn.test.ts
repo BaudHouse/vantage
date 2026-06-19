@@ -85,6 +85,28 @@ describe('forecastSeries', () => {
     const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 5 })
     expect(f.surprise).toBeLessThan(3)
   })
+
+  it('brackets each point forecast with a prediction interval', () => {
+    const series = Array.from({ length: 120 }, (_, i) => 50 + 40 * Math.sin(i / 3))
+    const f = forecastSeries(series, { window: 8, hidden: 10, epochs: 500, seed: 1 })
+    expect(f.lower).toHaveLength(f.predictions.length)
+    expect(f.upper).toHaveLength(f.predictions.length)
+    f.predictions.forEach((p, h) => {
+      expect(f.lower[h]).toBeLessThanOrEqual(p)
+      expect(f.upper[h]).toBeGreaterThanOrEqual(p)
+      // a model with real error has a band of positive width
+      expect(f.upper[h]).toBeGreaterThan(f.lower[h])
+      // and the band never escapes the range the model actually observed
+      expect(f.lower[h]).toBeGreaterThanOrEqual(Math.min(...series))
+      expect(f.upper[h]).toBeLessThanOrEqual(Math.max(...series))
+    })
+  })
+
+  it('gives a zero-width band for a flat (zero-error) series', () => {
+    const f = forecastSeries(new Array(30).fill(5))
+    expect(f.lower).toEqual(f.predictions)
+    expect(f.upper).toEqual(f.predictions)
+  })
 })
 
 describe('backtestSeries (walk-forward validation)', () => {

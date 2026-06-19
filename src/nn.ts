@@ -161,6 +161,12 @@ export interface SeriesForecast {
   // is otherwise skilful means the learned pattern just broke — a leading signal.
   predictedLast: number // model's 1-step expectation for the latest point
   surprise: number // |actual - predicted| / netRmse  (sigmas of model error)
+  // 80% prediction interval per horizon step, derived from the model's OWN
+  // out-of-sample error (netRmse). A point forecast is an opinion; a forecast
+  // with a calibrated band is a measurement. Width grows with the horizon as
+  // closed-loop error compounds (≈ √step, the random-walk error-growth rule).
+  lower: number[] // per-step lower bound (raw scale), aligned with predictions
+  upper: number[] // per-step upper bound (raw scale), aligned with predictions
 }
 
 export interface ForecastOpts {
@@ -302,7 +308,12 @@ const EMPTY: SeriesForecast = {
   trained: false,
   predictedLast: 0,
   surprise: 0,
+  lower: [],
+  upper: [],
 }
+
+// z for an 80% two-sided prediction interval under a Gaussian residual model.
+const Z80 = 1.2816
 
 /**
  * Train a windowed MLP on a 1-D series and forecast the next `horizon` steps
@@ -338,6 +349,9 @@ export function forecastSeries(
       trained: true,
       predictedLast: v,
       surprise: 0,
+      // a perfectly flat series has zero observed error → zero-width band
+      lower: new Array(horizon).fill(v),
+      upper: new Array(horizon).fill(v),
     }
   }
   const norm = series.map((v) => ((v - min) / range) * (hi - lo) + lo)
@@ -395,6 +409,21 @@ export function forecastSeries(
     buf.push(y)
   }
 
+  // 80% prediction interval per step. The 1-step residual std is ~netRmse; for
+  // multi-step closed-loop forecasts error compounds, so the band widens as
+  // √step (the standard random-walk error-growth approximation). Bounds are
+  // clamped to the observed range — the model never saw values outside it, so a
+  // band running past min/max would over-claim.
+  const lower: number[] = []
+  const upper: number[] = []
+  for (let h = 0; h < predictions.length; h++) {
+    const halfWidth = Z80 * netRmse * Math.sqrt(h + 1)
+    const lo2 = Math.max(min, predictions[h] - halfWidth)
+    const hi2 = Math.min(max, predictions[h] + halfWidth)
+    lower.push(Math.round(lo2 * 10) / 10)
+    upper.push(Math.round(hi2 * 10) / 10)
+  }
+
   return {
     predictions,
     netRmse,
@@ -403,6 +432,8 @@ export function forecastSeries(
     trained: true,
     predictedLast,
     surprise: Math.round(surprise * 10) / 10,
+    lower,
+    upper,
   }
 }
 

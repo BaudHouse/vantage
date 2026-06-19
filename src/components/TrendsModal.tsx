@@ -87,9 +87,13 @@ export default function TrendsModal({
     }
     const spikes = anoms.map((a) => {
       const fc = forecasts[a.key]
+      const band =
+        fc?.trained && fc.upper.length > 0 && fc.upper[0] > fc.lower[0]
+          ? `, 80% interval ${fc.lower[0]}–${fc.upper[0]}`
+          : ''
       const proj =
         fc?.trained && fc.skill > 0.02
-          ? ` | neural forecast next: ${fc.predictions.join(', ')} (beats naive by ${Math.round(
+          ? ` | neural forecast next: ${fc.predictions.join(', ')}${band} (beats naive by ${Math.round(
               fc.skill * 100,
             )}%)`
           : ''
@@ -487,6 +491,20 @@ export default function TrendsModal({
                               ↺
                             </em>
                           ) : null}
+                          {fc.upper.length > 0 && fc.upper[0] > fc.lower[0] && (
+                            <em
+                              className="nn-pi"
+                              style={{
+                                opacity: 0.7,
+                                fontStyle: 'normal',
+                                marginLeft: 4,
+                              }}
+                              title="80% prediction interval, from the model's out-of-sample error"
+                            >
+                              (80%: {debias(m.key, [fc.lower[0]])[0]}–
+                              {debias(m.key, [fc.upper[0]])[0]})
+                            </em>
+                          )}
                           <em
                             className={
                               fc.skill > 0.02
