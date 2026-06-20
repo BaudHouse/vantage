@@ -70,21 +70,36 @@ export async function chat(
   })
 }
 
-export async function ollamaModel(): Promise<string | null> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    const names: string[] = (j?.models ?? []).map((m: any) => m.name)
-    if (!names.length) return null
-    for (const p of PREFERRED) {
-      const hit = names.find((n) => n === p || n.startsWith(p))
-      if (hit) return hit
+/**
+ * Installed model names, or null if Ollama can't be reached. A LOCAL Ollama can
+ * be momentarily unresponsive while it COLD-LOADS a multi-GB model (a 14B off a
+ * secondary disk is ~20s) — during that window even the metadata /api/tags lags
+ * well past a couple seconds. So we retry over a generous window instead of
+ * declaring the model "not ready" on the first short hiccup. Two properties keep
+ * this from hurting: the happy path returns on attempt 0 (~10ms), and when
+ * Ollama is genuinely DOWN the fetch fails fast (connection refused, not a
+ * timeout), so all retries elapse in well under a second.
+ */
+async function listModels(): Promise<string[] | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 7000 })
+    if (r && r.ok) {
+      const j = await r.json().catch(() => null)
+      return ((j?.models ?? []) as { name: string }[]).map((m) => m.name)
     }
-    return names[0]
-  } catch {
-    return null
+    if (attempt < 2) await new Promise((res) => setTimeout(res, 1000))
   }
+  return null
+}
+
+export async function ollamaModel(): Promise<string | null> {
+  const names = await listModels()
+  if (!names || !names.length) return null
+  for (const p of PREFERRED) {
+    const hit = names.find((n) => n === p || n.startsWith(p))
+    if (hit) return hit
+  }
+  return names[0]
 }
 
 // Vision-capable Ollama models, in preference order.
@@ -99,39 +114,24 @@ const VISION_MODELS = [
  * models so the drafts are genuinely independent, not just temperature-varied.
  */
 export async function chatModels(): Promise<string[]> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
-    if (!r || !r.ok) return []
-    const j = await r.json()
-    const names: string[] = (j?.models ?? [])
-      .map((m: any) => m.name as string)
-      .filter(
-        (n: string) =>
-          !/embed|nomic|vl|vision|llava|minicpm|bakllava|moondream/i.test(n),
-      )
-    const ordered: string[] = []
-    for (const p of PREFERRED) {
-      const hit = names.find((n) => n === p || n.startsWith(p))
-      if (hit && !ordered.includes(hit)) ordered.push(hit)
-    }
-    for (const n of names) if (!ordered.includes(n)) ordered.push(n)
-    return ordered
-  } catch {
-    return []
+  const all = await listModels()
+  if (!all) return []
+  const names = all.filter(
+    (n) => !/embed|nomic|vl|vision|llava|minicpm|bakllava|moondream/i.test(n),
+  )
+  const ordered: string[] = []
+  for (const p of PREFERRED) {
+    const hit = names.find((n) => n === p || n.startsWith(p))
+    if (hit && !ordered.includes(hit)) ordered.push(hit)
   }
+  for (const n of names) if (!ordered.includes(n)) ordered.push(n)
+  return ordered
 }
 
 /** Find an installed embedding model (e.g. nomic-embed-text), or null. */
 export async function embedModel(): Promise<string | null> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    const names: string[] = (j?.models ?? []).map((m: any) => m.name)
-    return names.find((n) => /embed/i.test(n)) ?? null
-  } catch {
-    return null
-  }
+  const names = await listModels()
+  return names?.find((n) => /embed/i.test(n)) ?? null
 }
 
 /** Embed a batch of texts; returns one vector per input, or null on failure. */
@@ -157,19 +157,13 @@ export async function embed(
 }
 
 export async function visionModel(): Promise<string | null> {
-  try {
-    const r = await rawFetch(`${OLLAMA}/api/tags`, { ms: 2500 })
-    if (!r || !r.ok) return null
-    const j = await r.json()
-    const names: string[] = (j?.models ?? []).map((m: any) => m.name)
-    for (const v of VISION_MODELS) {
-      const hit = names.find((n) => n.toLowerCase().includes(v))
-      if (hit) return hit
-    }
-    return null
-  } catch {
-    return null
+  const names = await listModels()
+  if (!names) return null
+  for (const v of VISION_MODELS) {
+    const hit = names.find((n) => n.toLowerCase().includes(v))
+    if (hit) return hit
   }
+  return null
 }
 
 const VISION_SYSTEM = `You are VANTAGE Operator analyzing a live camera frame for

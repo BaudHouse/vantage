@@ -133,6 +133,13 @@ Reply with ONLY JSON, no prose:
 {"chains":[{"steps":[{"domain":"...","effect":"...","likelihood":NN,"horizon":"..."}]}],"bottom_line":"..."}`
 
 /** Ask the local model to trace a butterfly-effect cascade from a trigger. */
+// A full cascade is a long, structured generation. On a CPU-only Ollama a 14B
+// model runs at only a few tok/s, so a single draft can take 2-4 minutes — well
+// past chat()'s 120s default, which would silently return null and leave the
+// cascade empty. Give every cascade generation a 5-minute ceiling so it finishes
+// on slow hardware (it still returns the moment the model is done; GPU is fast).
+const CASCADE_MS = 300_000
+
 export async function traceCascade(
   model: string,
   trigger: string,
@@ -146,7 +153,7 @@ export async function traceCascade(
       content: `TRIGGER: ${trigger}\n\nLIVE SITUATION:\n${context}\n\nMap the cascade as JSON:`,
     },
   ]
-  const text = await chat(model, messages, { temperature })
+  const text = await chat(model, messages, { temperature, ms: CASCADE_MS })
   return text == null ? { chains: [], bottomLine: '' } : parseCascade(text)
 }
 
@@ -242,7 +249,7 @@ export async function traceCascadeEnsemble(
         content: `TRIGGER: ${trigger}\nN = ${drafts.length} drafts.\n\n${draftBlock}\n\nReturn the reconciled consensus JSON:`,
       },
     ],
-    { temperature: 0.25 },
+    { temperature: 0.25, ms: CASCADE_MS },
   )
   const merged = text ? parseCascade(text) : { chains: [], bottomLine: '' }
   if (!merged.chains.length) return { ...drafts[0], samples: drafts.length }
@@ -261,7 +268,7 @@ export async function traceCascadeEnsemble(
         )}\n\nReturn the calibrated JSON:`,
       },
     ],
-    { temperature: 0.2 },
+    { temperature: 0.2, ms: CASCADE_MS },
   )
   const calibrated = critText ? parseCascade(critText) : { chains: [], bottomLine: '' }
   const final = calibrated.chains.length ? calibrated : merged
