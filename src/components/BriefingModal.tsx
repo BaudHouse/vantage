@@ -52,10 +52,14 @@ export default function BriefingModal({ briefing, onClose, getContext }: Props) 
       (outlook?.text ? `\n\n## Forecast — next 24-72h\n${outlook.text}\n` : '') +
       '\n'
     const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
+    a.href = url
     a.download = `vantage-briefing-${briefing.date.replace(/\W+/g, '-')}.md`
     a.click()
+    // Release the blob once the download has kicked off; otherwise it (and its
+    // markdown payload) leaks for the life of the page.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
   return (

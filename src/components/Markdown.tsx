@@ -9,7 +9,11 @@ import { safeUrl } from '../safe'
 function inline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = []
   // Order matters: code first (so ** inside `code` is literal), then bold, italic.
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(_[^_]+_)|(\[[^\]]+\]\([^)]+\))/g
+  // Underscore emphasis requires word boundaries so intra-word underscores in
+  // LLM output (VITE_FIRMS_KEY, some_var_name, file paths) aren't mangled into
+  // italics; asterisk emphasis stays unconditional.
+  const re =
+    /(`[^`]+`)|(\*\*[^*]+\*\*)|((?<![A-Za-z0-9])__[^_]+__(?![A-Za-z0-9]))|(\*[^*]+\*)|((?<![A-Za-z0-9])_[^_]+_(?![A-Za-z0-9]))|(\[[^\]]+\]\([^)]+\))/g
   let last = 0
   let m: RegExpExecArray | null
   let i = 0

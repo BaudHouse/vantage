@@ -241,6 +241,11 @@ export function forecastMultivariate(
 
   const lo = 0.1
   const hi = 0.9
+  // Whole-matrix scaling (see forecastSeries): a sigmoid-output MLP can't predict
+  // beyond the range it was scaled on, so this is what lets a cross-signal surge
+  // forecast a target value above recent highs. The single-split skill is thus
+  // mildly optimistic; it's the provisional estimate (there is no walk-forward
+  // backtest for the multivariate model), read as directional, not precise.
   const mins = new Array(F).fill(Infinity)
   const maxs = new Array(F).fill(-Infinity)
   for (const row of matrix) {
@@ -335,6 +340,12 @@ export function forecastSeries(
 
   const lo = 0.1
   const hi = 0.9
+  // Normalize on the WHOLE series (not train-only): a sigmoid-output MLP cannot
+  // predict beyond the range it was scaled on, so whole-series scaling is what
+  // lets the closed-loop forecast EXTRAPOLATE a rising/falling trend past recent
+  // extremes — the forecaster's core job. The single-split skill below is thus
+  // mildly optimistic (the tail informs the scale); that's an accepted tradeoff,
+  // and `backtestSeries` is the leakage-free, honest skill measure.
   const min = Math.min(...series)
   const max = Math.max(...series)
   const range = max - min
@@ -357,7 +368,7 @@ export function forecastSeries(
   const norm = series.map((v) => ((v - min) / range) * (hi - lo) + lo)
   const denorm = (n: number) => ((n - lo) / (hi - lo)) * range + min
 
-  // hold out the last ~20% (>=3) of predictable points to score.
+  // hold out the last ~20% (>=3) of predictable points to score out-of-sample.
   const samples = norm.length - window
   const testN = Math.max(3, Math.round(samples * 0.2))
   const trainUpb = norm.length - testN

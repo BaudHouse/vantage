@@ -175,6 +175,14 @@ describe('forecastMultivariate', () => {
     expect(forecastMultivariate([[1, 2]], 5).trained).toBe(false)
   })
 
+  it('rejects a ragged matrix (guards against NaN normalization)', () => {
+    // a row with a different width would leave a feature min/max unscaled → NaN;
+    // the guard must bail with trained=false and features from the first row.
+    const f = forecastMultivariate([[1, 2], [3], [4, 5]], 0)
+    expect(f).toMatchObject({ trained: false, features: 2 })
+    expect(Number.isFinite(f.skill)).toBe(true)
+  })
+
   it('learns a CROSS-signal lead relationship a univariate model would miss', () => {
     // signal 0 is a leading driver; the target (signal 1) follows it by 1 step
     // with its OWN value being near-random noise — so naive persistence of the

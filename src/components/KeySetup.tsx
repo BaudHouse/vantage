@@ -68,8 +68,8 @@ export default function KeySetup({ open, onClose }: Props) {
           </button>
         </div>
         <p className="ks-intro">
-          Everything else runs key-less. These two layers need a free key
-          (no payment, ~1 minute each). Keys are stored only on your machine.
+          Everything else runs key-less. These {KEYS.length} layers need a free
+          key (no payment, ~1 minute each). Keys are stored only on your machine.
         </p>
 
         {KEYS.map((k) => (
@@ -95,7 +95,7 @@ export default function KeySetup({ open, onClose }: Props) {
 
         <div className="ks-foot">
           <b>Where:</b> create / edit{' '}
-          <code>C:\Projects\conflictly\.env.local</code>, add the line(s) above,
+          <code>.env.local</code> in the project root, add the line(s) above,
           then restart the dev server. The file is gitignored, so keys are never
           committed. Note: for <i>local use</i> they stay on this machine — but
           a packaged build inlines <code>VITE_</code> vars, so don't distribute a

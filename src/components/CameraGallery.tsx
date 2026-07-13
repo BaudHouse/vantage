@@ -21,6 +21,10 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
   const [q, setQ] = useState('')
   const [tick, setTick] = useState(0)
   const [lbTick, setLbTick] = useState(0)
+  // Cams whose thumbnail failed to load. Tracked in state (not by mutating the
+  // DOM) so a recovered feed's onLoad can un-hide it — a transient blip must
+  // not drop a camera permanently for the life of the open gallery.
+  const [failed, setFailed] = useState<Set<string>>(new Set())
   const [zoom, setZoom] = useState<Camera | null>(null)
   const [vBusy, setVBusy] = useState(false)
   const [vResult, setVResult] = useState<string | null>(null)
@@ -176,15 +180,27 @@ export default function CameraGallery({ cameras, open, onClose }: Props) {
 
         <div className="cg-grid">
           {list.map((c) => (
-            <button className="cg-cell" key={c.id} onClick={() => setZoom(c)}>
+            <button
+              className="cg-cell"
+              key={c.id}
+              hidden={failed.has(c.id)}
+              onClick={() => setZoom(c)}
+            >
               <img
                 src={live(c.image, tick)}
                 alt={c.name}
                 loading="lazy"
-                onError={(e) => {
-                  const cell = (e.currentTarget.closest('.cg-cell') as HTMLElement)
-                  if (cell) cell.style.display = 'none'
-                }}
+                onError={() =>
+                  setFailed((f) => (f.has(c.id) ? f : new Set(f).add(c.id)))
+                }
+                onLoad={() =>
+                  setFailed((f) => {
+                    if (!f.has(c.id)) return f
+                    const n = new Set(f)
+                    n.delete(c.id)
+                    return n
+                  })
+                }
               />
               <span className="cg-cap">
                 {c.name}

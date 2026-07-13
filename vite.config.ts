@@ -26,6 +26,11 @@ function imgProxy(): Plugin {
           return res.end('bad url')
         }
         if (
+          // IPv6 literals arrive bracketed ("[::1]", "[fe80::1]"), so a plain
+          // "host === '::1'" never matches them. This dev proxy only fetches
+          // public image feeds, so refuse ANY IPv6 literal outright — closing
+          // loopback/link-local/ULA/IPv4-mapped in one shot.
+          host.startsWith('[') ||
           host === 'localhost' ||
           host.endsWith('.localhost') ||
           host === '0.0.0.0' ||

@@ -442,7 +442,10 @@ export default function App() {
   // abnormal spikes) AND where the trained net projects each is heading, so it
   // reasons from real leading indicators + the quantitative trajectory.
   const cascadeGrounding = useMemo(() => {
-    if (!anomalies.length) return ''
+    // Only ButterflyModal consumes this, and only while it's open — don't train
+    // up to 6 nets every refresh in the common closed-modal case. Opening the
+    // modal flips butterfly.open, recomputing this before the user can trace.
+    if (!butterfly.open || !anomalies.length) return ''
     const lines = anomalies.slice(0, 6).map((a) => {
       const series = snaps.map((s) => s.m[a.key] ?? 0)
       const fc = forecastSeries(series, {
@@ -469,7 +472,7 @@ export default function App() {
     // snaps is updated together with anomalies each cycle; keying on anomalies
     // is sufficient and avoids retraining on unrelated re-renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anomalies])
+  }, [anomalies, butterfly.open])
   // Pin a region; seed its baseline at the current level so only *future*
   // escalation alerts (you opted in knowing the current state).
   // These run from event handlers, so the current `watch`/`baseline` closures

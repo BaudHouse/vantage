@@ -40,22 +40,58 @@ function loadKeys() {
 }
 const KEYS = loadKeys()
 
+// Loopback / link-local / private / metadata hosts. 127.0.0.1 and localhost are
+// allow-listed for the local Ollama, but a PUBLIC feed must never be able to
+// redirect a request onto them — so these are only permitted when the request
+// already started there. IPv6 literals arrive bracketed, hence the strip.
+function isPrivateHost(h) {
+  h = String(h || '').toLowerCase().replace(/^\[|\]$/g, '')
+  return (
+    h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' ||
+    h === '::1' || h === '::' || h.startsWith('fe80:') ||
+    /^f[cd][0-9a-f]{2}:/.test(h) ||
+    /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^169\.254\./.test(h)
+  )
+}
+
+// Fetch with MANUAL redirect handling: the initial host must be allow-listed,
+// and no hop may pivot into a private/loopback host unless the request already
+// started there (defeats redirect-based SSRF into local Ollama / the LAN /
+// cloud metadata). Bounded hops. Returns the final Response, or null if blocked.
+async function guardedFetch(url, opts, maxHops = 5) {
+  let current = url
+  const startPrivate = isPrivateHost(new URL(url).hostname)
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const host = new URL(current).hostname
+    if (hop === 0 && !ALLOWED_HOSTS.has(host)) return null
+    if (!startPrivate && isPrivateHost(host)) return null
+    const r = await fetch(current, { ...opts, redirect: 'manual' })
+    if (r.status >= 300 && r.status < 400) {
+      const loc = r.headers.get('location')
+      if (loc) {
+        current = new URL(loc, current).href
+        continue
+      }
+    }
+    return r
+  }
+  return null // too many redirects
+}
+
 // Renderer asks main to fetch (Node has no CORS) so webSecurity stays ON.
 ipcMain.handle('net:fetch', async (_e, req) => {
   try {
-    const u = new URL(req.url)
-    if (!ALLOWED_HOSTS.has(u.hostname)) {
-      return { ok: false, status: 403, text: '' }
-    }
     // Honor the caller's timeout (the cascade needs up to 5 min on CPU Ollama),
     // clamped to a sane ceiling so a bad value can't hang the handler forever.
     const timeoutMs = Math.min(Math.max(Number(req.ms) || 130000, 1000), 300000)
-    const r = await fetch(req.url, {
+    const r = await guardedFetch(req.url, {
       method: req.method || 'GET',
       headers: req.headers,
       body: req.body,
       signal: AbortSignal.timeout(timeoutMs),
     })
+    if (!r) return { ok: false, status: 403, text: '' }
     return { ok: r.ok, status: r.status, text: await r.text() }
   } catch {
     return { ok: false, status: 0, text: '' }
@@ -66,10 +102,8 @@ ipcMain.handle('net:fetch', async (_e, req) => {
 // frames to the local vision model.
 ipcMain.handle('net:image', async (_e, url) => {
   try {
-    const u = new URL(url)
-    if (!ALLOWED_HOSTS.has(u.hostname)) return null
-    const r = await fetch(url, { signal: AbortSignal.timeout(15000) })
-    if (!r.ok) return null
+    const r = await guardedFetch(url, { signal: AbortSignal.timeout(15000) })
+    if (!r || !r.ok) return null
     return Buffer.from(await r.arrayBuffer()).toString('base64')
   } catch {
     return null
