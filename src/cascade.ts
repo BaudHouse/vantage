@@ -317,7 +317,10 @@ async function measureAgreement(
           agree++
         }
       })
-      ch.agreement = Math.max(1, agree)
+      // Record the MEASURED agreement, including 0: a reconciled/critiqued chain
+      // that no draft actually supports should honestly report zero (the badge
+      // is truthy-guarded, so 0 simply hides it) — not be floored up to 1.
+      ch.agreement = agree
     })
   } catch {
     /* keep model-reported agreement */

@@ -116,9 +116,14 @@ const VISION_MODELS = [
 export async function chatModels(): Promise<string[]> {
   const all = await listModels()
   if (!all) return []
-  const names = all.filter(
-    (n) => !/embed|nomic|vl|vision|llava|minicpm|bakllava|moondream/i.test(n),
-  )
+  // Exclude embedding + vision models. Reuse the authoritative VISION_MODELS
+  // list rather than a broad substring regex — the old bare `vl` token would
+  // drop any general model whose name merely contained "vl".
+  const names = all.filter((n) => {
+    const low = n.toLowerCase()
+    if (/embed|nomic/.test(low)) return false
+    return !VISION_MODELS.some((v) => low.includes(v))
+  })
   const ordered: string[] = []
   for (const p of PREFERRED) {
     const hit = names.find((n) => n === p || n.startsWith(p))

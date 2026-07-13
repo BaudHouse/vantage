@@ -44,6 +44,18 @@ describe('resolvePlace — the headline-geocoding moat', () => {
     expect(r?.precise).toBe(false)
   })
 
+  it('finds a standalone alias even when it first appears embedded in a word', () => {
+    // "india" (and "indian") appear inside "indiana" first, then "India" stands
+    // alone — the scanner must keep looking past the embedded first hit.
+    const r = resolvePlace(
+      'Indiana plant fire; separately India reports a border clash',
+      'United States',
+      centroid,
+    )
+    expect(r?.country).toBe('India')
+    expect(r?.precise).toBe(true)
+  })
+
   it('resolves a country named in the headline (precise, not publisher)', () => {
     const r = resolvePlace('France pledges more aid amid protests', 'United States', centroid)
     expect(r?.country).toBe('France')

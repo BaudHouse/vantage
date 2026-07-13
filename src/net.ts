@@ -13,6 +13,7 @@ interface Bridge {
     method?: string
     headers?: Record<string, string>
     body?: string
+    ms?: number
   }) => Promise<{ ok: boolean; status: number; text: string }>
   fetchImage?: (url: string) => Promise<string | null>
   keys?: Record<string, string>
@@ -37,7 +38,9 @@ export async function rawFetch(
   const { method = 'GET', headers, body, ms = 9000 } = opts
   if (bridge?.netFetch) {
     try {
-      const r = await bridge.netFetch({ url, method, headers, body })
+      // Forward `ms` so the main process honors the caller's timeout (e.g. the
+      // 5-min cascade ceiling) instead of a fixed cap — see electron/main.cjs.
+      const r = await bridge.netFetch({ url, method, headers, body, ms })
       return new Response(r.text, { status: r.status })
     } catch {
       return null

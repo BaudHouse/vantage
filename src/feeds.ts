@@ -208,26 +208,68 @@ async function fetchQuakes(): Promise<GeoEvent[]> {
     if (!r || !r.ok) return []
     const j = await r.json()
     const feats: any[] = j?.features ?? []
-    return feats
-      .filter((f) => f?.geometry?.coordinates?.length >= 2)
-      .map((f) => {
-        const [lng, lat] = f.geometry.coordinates
-        const mag = Number(f.properties?.mag ?? 0)
-        return {
-          id: `usgs-${f.id}`,
-          kind: 'quake' as const,
-          lat,
-          lng,
-          title: f.properties?.title ?? `M${mag} quake`,
-          detail: `Magnitude ${mag.toFixed(1)}`,
-          url: f.properties?.url,
-          weight: clamp01((mag - 2.5) / 5),
-          time: Number(f.properties?.time ?? Date.now()),
-        }
+    const out: GeoEvent[] = []
+    for (const f of feats) {
+      const c = f?.geometry?.coordinates
+      if (!Array.isArray(c) || c.length < 2) continue
+      // USGS emits [null,null,null] for events still being located — guard the
+      // coordinates (a null/NaN lat would crash the de-dup in App.tsx and the
+      // globe), matching every sibling parser.
+      const lng = Number(c[0])
+      const lat = Number(c[1])
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+      let mag = Number(f.properties?.mag)
+      if (!Number.isFinite(mag)) mag = 0
+      out.push({
+        id: `usgs-${f.id}`,
+        kind: 'quake' as const,
+        lat,
+        lng,
+        title: f.properties?.title ?? `M${mag} quake`,
+        detail: `Magnitude ${mag.toFixed(1)}`,
+        url: f.properties?.url,
+        weight: clamp01((mag - 2.5) / 5),
+        time: Number(f.properties?.time ?? Date.now()),
       })
+    }
+    return out
   } catch {
     return []
   }
+}
+
+/**
+ * EONET geometry → [lat, lng], or null. Point coordinates are [lng,lat];
+ * Polygon/MultiPolygon events (large fires, ice, storm swaths) nest their
+ * coordinates in ring arrays — descend to the first ring and average it, rather
+ * than dropping the event (which a plain [lng,lat] destructure would do).
+ */
+export function eonetCentroid(coords: unknown): [number, number] | null {
+  if (!Array.isArray(coords) || !coords.length) return null
+  if (typeof coords[0] === 'number') {
+    const lng = Number(coords[0])
+    const lat = Number(coords[1])
+    return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null
+  }
+  // Descend nested rings (Polygon = [ring], MultiPolygon = [[ring]]) until `ring`
+  // is the array of [lng,lat] positions (its first element is a position whose
+  // own first element is a number), then average that ring.
+  let ring: any = coords
+  while (Array.isArray(ring[0]) && Array.isArray(ring[0][0])) {
+    ring = ring[0]
+  }
+  if (!Array.isArray(ring) || !ring.length) return null
+  let sx = 0
+  let sy = 0
+  let n = 0
+  for (const p of ring) {
+    if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+      sx += p[0]
+      sy += p[1]
+      n++
+    }
+  }
+  return n ? [sy / n, sx / n] : null
 }
 
 /** NASA EONET — open satellite-tracked natural events (fires, storms, volcanoes). No key. */
@@ -242,10 +284,9 @@ async function fetchDisasters(): Promise<GeoEvent[]> {
     for (const e of evs) {
       const geoms: any[] = e?.geometry ?? []
       const g = geoms[geoms.length - 1] // most recent position
-      const coords = g?.coordinates
-      if (!Array.isArray(coords) || coords.length < 2) continue
-      const [lng, lat] = coords
-      if (typeof lat !== 'number' || typeof lng !== 'number') continue
+      const ll = eonetCentroid(g?.coordinates)
+      if (!ll) continue
+      const [lat, lng] = ll
       const cat = e?.categories?.[0]?.title ?? 'Event'
       out.push({
         id: `eonet-${e.id}`,

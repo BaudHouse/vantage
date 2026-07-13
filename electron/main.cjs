@@ -47,11 +47,14 @@ ipcMain.handle('net:fetch', async (_e, req) => {
     if (!ALLOWED_HOSTS.has(u.hostname)) {
       return { ok: false, status: 403, text: '' }
     }
+    // Honor the caller's timeout (the cascade needs up to 5 min on CPU Ollama),
+    // clamped to a sane ceiling so a bad value can't hang the handler forever.
+    const timeoutMs = Math.min(Math.max(Number(req.ms) || 130000, 1000), 300000)
     const r = await fetch(req.url, {
       method: req.method || 'GET',
       headers: req.headers,
       body: req.body,
-      signal: AbortSignal.timeout(130000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     return { ok: r.ok, status: r.status, text: await r.text() }
   } catch {

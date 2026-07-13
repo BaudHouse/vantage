@@ -5,6 +5,7 @@
 
 import type { Fire } from './layers'
 import { getKey, rawFetch } from './net'
+import { eonetCentroid } from './feeds'
 
 const DEV = import.meta.env.DEV
 const FIRMS = DEV ? '/feeds/firms' : 'https://firms.modaps.eosdis.nasa.gov'
@@ -33,10 +34,9 @@ async function fetchEonetFires(): Promise<Fire[]> {
     for (const e of j?.events ?? []) {
       const geoms: any[] = e?.geometry ?? []
       const g = geoms[geoms.length - 1]
-      const coords = g?.coordinates
-      if (!Array.isArray(coords) || coords.length < 2) continue
-      const [lng, lat] = coords
-      if (typeof lat !== 'number' || typeof lng !== 'number') continue
+      const ll = eonetCentroid(g?.coordinates)
+      if (!ll) continue
+      const [lat, lng] = ll
       out.push({
         kind: 'fire',
         id: `eonet-${e.id}`,
@@ -57,7 +57,9 @@ async function fetchEonetFires(): Promise<Fire[]> {
 }
 
 function parseCsv(text: string): Record<string, string>[] {
-  const lines = text.trim().split('\n')
+  // Split CRLF-tolerantly: a stray \r would otherwise stick to the last header
+  // key (daynight) and value, silently misclassifying every fire as "Day".
+  const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return []
   const headers = lines[0].split(',')
   return lines.slice(1).map((line) => {

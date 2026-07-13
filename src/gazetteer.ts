@@ -231,12 +231,18 @@ const COUNTRY_INDEX: { alias: string; country: Country }[] = COUNTRIES.flatMap(
 ).sort((a, b) => b.alias.length - a.alias.length)
 
 function hasWord(haystack: string, needle: string): boolean {
-  const i = haystack.indexOf(needle)
-  if (i < 0) return false
-  const before = i === 0 ? ' ' : haystack[i - 1]
-  const after =
-    i + needle.length >= haystack.length ? ' ' : haystack[i + needle.length]
-  return !/[a-z]/.test(before) && !/[a-z]/.test(after)
+  // Check EVERY occurrence, not just the first: an alias can appear embedded in
+  // a larger word ("india" inside "indiana") before a later standalone mention.
+  // Stopping at the first hit would miss the standalone one.
+  let i = haystack.indexOf(needle)
+  while (i >= 0) {
+    const before = i === 0 ? ' ' : haystack[i - 1]
+    const after =
+      i + needle.length >= haystack.length ? ' ' : haystack[i + needle.length]
+    if (!/[a-z]/.test(before) && !/[a-z]/.test(after)) return true
+    i = haystack.indexOf(needle, i + 1)
+  }
+  return false
 }
 
 export interface Resolved {
