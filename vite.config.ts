@@ -153,7 +153,10 @@ export default defineConfig({
       },
       // ---- expansion feeds (all free / key-less) ----
       '/feeds/gdacs': { target: 'https://www.gdacs.org', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/gdacs/, '') },
-      '/feeds/usgsvolc': { target: 'https://volcanoes.usgs.gov', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/usgsvolc/, '') },
+      // NOTE: must NOT start with '/feeds/usgs' — Vite matches proxy keys by
+      // string prefix in declaration order, so '/feeds/usgs' (earthquake) would
+      // shadow it and silently rewrite to earthquake.usgs.gov/volc/... (404).
+      '/feeds/volcano': { target: 'https://volcanoes.usgs.gov', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/volcano/, '') },
       '/feeds/nhc': { target: 'https://www.nhc.noaa.gov', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/nhc/, '') },
       '/feeds/emsc': { target: 'https://www.seismicportal.eu', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/emsc/, '') },
       '/feeds/safecast': { target: 'https://api.safecast.org', changeOrigin: true, rewrite: (p) => p.replace(/^\/feeds\/safecast/, '') },

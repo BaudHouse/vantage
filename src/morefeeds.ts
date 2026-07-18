@@ -17,7 +17,9 @@ import type { GeoEvent } from './feeds'
 const DEV = import.meta.env.DEV
 const B = {
   gdacs: DEV ? '/feeds/gdacs' : 'https://www.gdacs.org',
-  usgsvolc: DEV ? '/feeds/usgsvolc' : 'https://volcanoes.usgs.gov',
+  // '/feeds/volcano' (not '/feeds/usgsvolc') — see vite.config.ts: a key starting
+  // with '/feeds/usgs' is shadowed by the earthquake proxy's prefix match.
+  usgsvolc: DEV ? '/feeds/volcano' : 'https://volcanoes.usgs.gov',
   nhc: DEV ? '/feeds/nhc' : 'https://www.nhc.noaa.gov',
   emsc: DEV ? '/feeds/emsc' : 'https://www.seismicportal.eu',
   safecast: DEV ? '/feeds/safecast' : 'https://api.safecast.org',
@@ -72,25 +74,27 @@ export async function fetchHazards(): Promise<Hazard[]> {
 
 // ---- USGS: elevated/active volcanoes ---------------------------------------
 export async function fetchVolcanoes(): Promise<Volcano[]> {
-  const j = await getJson(
-    `${B.usgsvolc}/hans-public/api/volcano/getElevatedVolcanoes`,
-  )
+  // Use the VSC "elevated" feed, NOT hans-public/getElevatedVolcanoes: the HANS
+  // response carries no coordinates at all (obs/volcano_name/alert_level only),
+  // so every entry failed the finite lat/lng guard and this layer was always
+  // empty. VSC returns the same alerts WITH lat/long.
+  const j = await getJson(`${B.usgsvolc}/vsc/api/volcanoApi/elevated`)
   const list: any[] = Array.isArray(j) ? j : (j?.data ?? [])
   const out: Volcano[] = []
   for (const v of list) {
-    const lat = Number(v.latitude)
-    const lng = Number(v.longitude)
+    const lat = Number(v.lat)
+    const lng = Number(v.long)
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
     out.push({
       kind: 'volcano',
-      id: `volc-${v.vnum ?? v.volcano_name ?? `${lat},${lng}`}`,
+      id: `volc-${v.vnum ?? v.vName ?? `${lat},${lng}`}`,
       lat,
       lng,
-      name: v.volcano_name ?? 'Volcano',
-      level: v.alert_level ?? v.color_code ?? 'Elevated',
-      color: v.color_code ?? '',
-      observatory: v.obs_abbr ?? v.obs_fullname ?? 'USGS',
-      region: v.subregion ?? v.region ?? '',
+      name: v.vName ?? 'Volcano',
+      level: v.alertLevel ?? v.colorCode ?? 'Elevated',
+      color: v.colorCode ?? '',
+      observatory: String(v.obs ?? 'USGS').toUpperCase(),
+      region: v.nvewsThreat ?? '',
     })
   }
   return out
@@ -200,8 +204,9 @@ export async function fetchWxAlerts(): Promise<WxAlert[]> {
 
 // ---- ISS live position ------------------------------------------------------
 export async function fetchSatellites(): Promise<Satellite[]> {
-  // wheretheiss is rate-limited (~1 req/s) and can be slow through a proxy.
-  const j = await getJson(`${B.iss}/v1/satellites/25544`, 12000)
+  // wheretheiss is rate-limited (~1 req/s) and slow through a proxy — measured
+  // ~14s, so a 12s budget aborted every call and the layer always read 0.
+  const j = await getJson(`${B.iss}/v1/satellites/25544`, 25000)
   if (!j || typeof j.latitude !== 'number' || typeof j.longitude !== 'number')
     return []
   return [
