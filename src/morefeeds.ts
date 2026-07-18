@@ -136,8 +136,23 @@ export async function fetchStorms(): Promise<Storm[]> {
 
 // ---- Safecast: crowdsourced radiation sensors ------------------------------
 export async function fetchRadiation(): Promise<Radiation[]> {
-  const j = await getJson(`${B.safecast}/measurements.json?order=captured_at+desc`)
-  const list: any[] = Array.isArray(j) ? j : []
+  // The API IGNORES `order` (verified: order=captured_at+desc, %20desc, DESC and
+  // no-order all return the same page), so the default listing pages from the
+  // OLDEST records — this layer was plotting 2013 measurements as if they were
+  // current. `captured_after` IS honoured, so use a rolling 24h cutoff to get
+  // genuinely recent readings.
+  // The API returns the first page AFTER the cutoff (oldest-first), so a tighter
+  // window yields fresher readings. Start narrow and widen only if it's sparse,
+  // so we show the freshest data without risking an empty layer in a quiet spell.
+  let list: any[] = []
+  for (const hours of [6, 24, 72]) {
+    const since = new Date(Date.now() - hours * 3600 * 1000).toISOString()
+    const j = await getJson(
+      `${B.safecast}/measurements.json?captured_after=${encodeURIComponent(since)}`,
+    )
+    list = Array.isArray(j) ? j : []
+    if (list.length >= 5) break
+  }
   const out: Radiation[] = []
   for (const m of list) {
     const lat = Number(m.latitude)
