@@ -30,6 +30,31 @@ export interface RawOpts {
   ms?: number
 }
 
+// ---- feed concurrency gate (dev/browser only) -----------------------------
+// In dev every feed is proxied through ONE origin (localhost:5174), so the
+// browser's ~6-connections-per-origin cap means a slow feed (ISS ~10s) can pin
+// slots while OTHER feeds sit queued — with their abort timers already ticking,
+// so they spuriously time out and their layer blanks to 0 (the "flicker").
+// Gate feed fetches to a handful in-flight AND start each request's timer only
+// AFTER it acquires a slot, so a timeout measures the request, not the wait.
+// Ollama (own single-flight queue, minutes-long) and the Electron main-process
+// path (no per-origin cap) are exempt.
+const FEED_LIMIT = 5
+let active = 0
+const waiters: (() => void)[] = []
+function acquire(): Promise<void> {
+  if (active < FEED_LIMIT) {
+    active++
+    return Promise.resolve()
+  }
+  return new Promise<void>((res) => waiters.push(res)) // slot handed over on release
+}
+function release(): void {
+  const next = waiters.shift()
+  if (next) next() // transfer the slot directly (active unchanged)
+  else active--
+}
+
 /** Low-level fetch with a hard timeout. Routes through Electron main in prod. */
 export async function rawFetch(
   url: string,
@@ -46,6 +71,9 @@ export async function rawFetch(
       return null
     }
   }
+  // Ollama has its own single-flight queue and long timeouts — never gate it.
+  const gated = !url.startsWith('/ollama') && !url.includes(':11434')
+  if (gated) await acquire()
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), ms)
   try {
@@ -54,6 +82,7 @@ export async function rawFetch(
     return null
   } finally {
     clearTimeout(t)
+    if (gated) release()
   }
 }
 
