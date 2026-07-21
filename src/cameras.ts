@@ -73,9 +73,14 @@ const CA_REGION: Record<string, string> = {
 
 /** Caltrans — periodic stills, broad California coverage. */
 async function fetchCaltrans(perDistrict = 40): Promise<Camera[]> {
-  const reqs = DISTRICTS.map((d) =>
-    tfetch(`${CT}/data/${d}/cctv/cctvStatus${d.toUpperCase()}.json`),
-  )
+  const reqs = DISTRICTS.map((d) => {
+    // The CCTV JSON FILENAME needs a zero-padded two-digit district (D02..D08);
+    // single-digit names (cctvStatusD2.json) 500. The /data/${d}/ path segment
+    // stays lowercase + unpadded. Without this, 7 of 9 districts (incl. LA d7,
+    // SF Bay d4) silently returned zero cameras.
+    const n = d.slice(1).padStart(2, '0')
+    return tfetch(`${CT}/data/${d}/cctv/cctvStatusD${n}.json`)
+  })
   const results = await Promise.allSettled(reqs)
   const out: Camera[] = []
   results.forEach((res, idx) => {

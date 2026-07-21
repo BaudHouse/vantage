@@ -193,28 +193,54 @@ function polyCentroid(geom: any): [number, number] | null {
   return [sy / ring.length, sx / ring.length]
 }
 
+// ~Half of active Severe/Extreme alerts (heat, flood watch, red-flag, tropical
+// watches) carry `geometry: null` and reference their area via `affectedZones`
+// (zone URLs). Without resolving those we silently drop half the layer. Zone
+// geometry is STATIC, so cache the centroid by zone URL — only the first poll
+// pays the fetch; subsequent polls reuse.
+const zoneCentroids = new Map<string, [number, number] | null>()
+async function zoneCentroid(zoneUrl: string): Promise<[number, number] | null> {
+  const cached = zoneCentroids.get(zoneUrl)
+  if (cached !== undefined) return cached
+  let c: [number, number] | null = null
+  try {
+    const path = new URL(zoneUrl).pathname // /zones/forecast/KYZ033
+    const zj = await getJson(`${B.nws}${path}`)
+    c = polyCentroid(zj?.geometry)
+  } catch {
+    c = null
+  }
+  zoneCentroids.set(zoneUrl, c)
+  return c
+}
+
 export async function fetchWxAlerts(): Promise<WxAlert[]> {
   const j = await getJson(`${B.nws}/alerts/active?severity=Severe,Extreme`)
-  const feats: any[] = j?.features ?? []
-  const out: WxAlert[] = []
-  for (const f of feats) {
-    const c = polyCentroid(f?.geometry)
-    if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue
-    const p = f?.properties ?? {}
-    out.push({
-      kind: 'alert',
-      id: `nws-${p.id ?? f.id}`,
-      lat: c[0],
-      lng: c[1],
-      event: p.event ?? 'Weather alert',
-      severity: p.severity ?? '',
-      area: p.areaDesc ?? '',
-      headline: p.headline ?? '',
-      url: undefined,
-      expires: p.expires ?? '',
-    })
-  }
-  return out.slice(0, 200)
+  const feats: any[] = (j?.features ?? []).slice(0, 200)
+  const resolved = await Promise.all(
+    feats.map(async (f): Promise<WxAlert | null> => {
+      let c = polyCentroid(f?.geometry)
+      if (!c) {
+        const zones: string[] = f?.properties?.affectedZones ?? []
+        if (zones.length) c = await zoneCentroid(zones[0])
+      }
+      if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) return null
+      const p = f?.properties ?? {}
+      return {
+        kind: 'alert',
+        id: `nws-${p.id ?? f.id}`,
+        lat: c[0],
+        lng: c[1],
+        event: p.event ?? 'Weather alert',
+        severity: p.severity ?? '',
+        area: p.areaDesc ?? '',
+        headline: p.headline ?? '',
+        url: undefined,
+        expires: p.expires ?? '',
+      }
+    }),
+  )
+  return resolved.filter((a): a is WxAlert => a !== null)
 }
 
 // ---- ISS live position ------------------------------------------------------
@@ -291,7 +317,10 @@ export async function fetchEmscQuakes(): Promise<GeoEvent[]> {
       lng,
       title: `M${mag.toFixed(1)} · ${p.flynn_region ?? 'earthquake'}`,
       detail: `Magnitude ${mag.toFixed(1)} · ${p.depth ?? '?'} km depth (EMSC)`,
-      url: p.url ?? undefined,
+      // The FDSN response has no `url` field — build the event page from unid.
+      url: (f.id ?? p.unid)
+        ? `https://www.seismicportal.eu/eventdetails.html?unid=${f.id ?? p.unid}`
+        : undefined,
       weight: Math.max(0, Math.min(1, (mag - 2.5) / 5)),
       time: p.time ? Date.parse(p.time) : Date.now(),
     })

@@ -9,7 +9,7 @@ const DEV_URL = 'http://localhost:5174'
 // This is the ONLY network the app makes — a tight, auditable surface.
 const ALLOWED_HOSTS = new Set([
   'api.gdeltproject.org', 'earthquake.usgs.gov', 'eonet.gsfc.nasa.gov',
-  'stooq.com', 'api.adsb.lol', 'cwwp2.dot.ca.gov', 'webcams.nyctmc.org',
+  'query1.finance.yahoo.com', 'api.adsb.lol', 'cwwp2.dot.ca.gov', 'webcams.nyctmc.org',
   'api.rainviewer.com', 'tilecache.rainviewer.com',
   'firms.modaps.eosdis.nasa.gov', 'raw.githubusercontent.com',
   // expansion feeds

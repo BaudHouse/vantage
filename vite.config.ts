@@ -105,10 +105,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/feeds\/eonet/, '/api/v3'),
       },
-      '/feeds/stooq': {
-        target: 'https://stooq.com',
+      '/feeds/yahoo': {
+        target: 'https://query1.finance.yahoo.com',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/feeds\/stooq/, ''),
+        rewrite: (p) => p.replace(/^\/feeds\/yahoo/, ''),
       },
       '/feeds/opensky': {
         target: 'https://opensky-network.org',

@@ -45,7 +45,9 @@ async function fetchEonetFires(): Promise<Fire[]> {
         brightness: 0,
         confidence: 'EONET tracked',
         satellite: 'NASA EONET',
-        frp: Number(g?.magnitudeValue ?? 0),
+        // EONET's magnitudeValue is ACREAGE, not fire radiative power — leave frp
+        // at 0 so it isn't rendered as "N MW" (only FIRMS rows carry real MW).
+        frp: 0,
         acquired: g?.date ?? '',
         daynight: '—',
       })
