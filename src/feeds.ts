@@ -355,7 +355,7 @@ export interface Stats {
 
 export function deriveStats(events: GeoEvent[]): Stats {
   const conflict = events.filter((e) => e.kind === 'conflict')
-  // Count distinct hotspot countries by intensity (matches conflictly's framing):
+  // Count distinct hotspot countries by intensity (matches Vantage's framing):
   //   active  = high-intensity flashpoints (>= 3 reports/24h)
   //   tensions = lower-intensity watch zones (1-2 reports/24h)
   return {

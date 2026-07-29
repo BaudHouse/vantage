@@ -1,5 +1,5 @@
 {
-  "name": "conflictly",
+  "name": "vantage",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,8 +14,8 @@
     "electron:build": "npm run build && electron-builder"
   },
   "build": {
-    "appId": "app.conflictly.desktop",
-    "productName": "Conflictly",
+    "appId": "app.vantage.desktop",
+    "productName": "Vantage",
     "files": [
       "dist/**/*",
       "electron/**/*"
