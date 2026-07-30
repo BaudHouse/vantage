@@ -46,17 +46,20 @@ jobs:
         env:
           GH_TOKEN: ""
 
+      # Only the NSIS installer ships. A recursive *.exe glob also catches
+      # win-unpacked/Vantage.exe and NSIS's elevate.exe helper, which are not
+      # deliverables — keep this non-recursive and installer-scoped.
       - name: Checksums
         shell: pwsh
         run: |
           Set-Location release
-          $items = Get-ChildItem -Include *.exe,*.blockmap -Recurse -File
-          if (-not $items) { $items = Get-ChildItem -Path . -Include *.exe -Recurse -File }
+          $items = Get-ChildItem -Filter "*Setup*.exe" -File
+          if (-not $items) { throw "no NSIS installer found in release/" }
           $items | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Set-Content -Encoding ascii SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
-          Get-ChildItem -Recurse -File | Select-Object Name,Length | Format-Table -AutoSize
+          "installer count: $($items.Count)"
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -64,5 +67,5 @@ jobs:
           name: Vantage ${{ steps.v.outputs.ver }}
           generate_release_notes: true
           files: |
-            release/**/*.exe
+            release/*Setup*.exe
             release/SHA256SUMS.txt
